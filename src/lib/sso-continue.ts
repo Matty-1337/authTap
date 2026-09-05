@@ -113,9 +113,8 @@ export async function attachContinueCookie(res: NextResponse, request: ContinueR
   });
 }
 
-export async function readContinueRequest(): Promise<ContinueRequest | null> {
-  const jar = await cookies();
-  const raw = jar.get(CONTINUE_COOKIE)?.value;
+/** Read at_continue from a raw cookie value — not from cookies() after writes. */
+export async function parseContinueCookie(raw: string | undefined | null): Promise<ContinueRequest | null> {
   if (!raw) return null;
   try {
     const { payload } = await jwtVerify(raw, key(), { algorithms: ["HS256"] });
@@ -127,6 +126,15 @@ export async function readContinueRequest(): Promise<ContinueRequest | null> {
   } catch {
     return null;
   }
+}
+
+export async function readContinueRequest(): Promise<ContinueRequest | null> {
+  const jar = await cookies();
+  return parseContinueCookie(jar.get(CONTINUE_COOKIE)?.value);
+}
+
+export function clearContinueCookie(res: NextResponse): void {
+  res.cookies.set(CONTINUE_COOKIE, "", { ...cookieBase(), maxAge: 0 });
 }
 
 export async function clearContinueRequest(): Promise<void> {
@@ -142,4 +150,12 @@ export function productLoginUrl(request: ContinueRequest, error?: string): strin
   const url = new URL("/login", request.returnTo);
   if (error) url.searchParams.set("error", error);
   return url.toString();
+}
+
+/** Product callback with the handoff code and the original SSO state. */
+export function productHandoffUrl(request: ContinueRequest, code: string): string {
+  const dest = new URL(request.returnTo);
+  dest.searchParams.set("code", code);
+  dest.searchParams.set("state", request.state);
+  return dest.toString();
 }

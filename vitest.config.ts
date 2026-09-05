@@ -11,6 +11,7 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"),
       "server-only": path.resolve(__dirname, "tests/stubs/server-only.ts"),
       "next/headers": path.resolve(__dirname, "tests/stubs/next-headers.ts"),
+      "next/navigation": path.resolve(__dirname, "tests/stubs/next-navigation.ts"),
     },
   },
 });
