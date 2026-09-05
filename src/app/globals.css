@@ -1,26 +1,64 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #161826;
+  --foreground: #f2f2f5;
+  --accent: #9b6dff;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-outfit);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+@keyframes authtap-om-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes authtap-om-breathe {
+  0%,
+  100% {
+    opacity: 0.82;
+    transform: scale(0.97);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.authtap-om-spin {
+  transform-origin: 50% 50%;
+  animation: authtap-om-spin 1.15s linear infinite;
+  will-change: transform;
+}
+
+.authtap-om-breathe {
+  animation: authtap-om-breathe 2.3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .authtap-om-breathe {
+    animation: none;
+  }
+}
+
+@keyframes authtap-splash-out {
+  to {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+
+.authtap-splash {
+  animation: authtap-splash-out 200ms ease 1s forwards;
 }
