@@ -13,6 +13,8 @@ export type HandoffResult =
 
 function productFor(client: SsoClient): string {
   switch (client) {
+    case "coretap":
+      return "coretap";
     case "nexustap":
       return "nexustap";
     case "signaltap":

@@ -3,12 +3,12 @@ import "server-only";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
-import { nexustapReturnOrigins, sessionSecret, signaltapReturnOrigins } from "@/lib/env";
+import { coretapReturnOrigins, nexustapReturnOrigins, sessionSecret, signaltapReturnOrigins } from "@/lib/env";
 
 export const CONTINUE_COOKIE = "at_continue";
 export const CONTINUE_TTL_SECONDS = 60 * 10;
 
-export const SSO_CLIENTS = ["nexustap", "signaltap"] as const;
+export const SSO_CLIENTS = ["coretap", "nexustap", "signaltap"] as const;
 export type SsoClient = (typeof SSO_CLIENTS)[number];
 
 export type ContinueRequest = {
@@ -36,6 +36,8 @@ function isSsoClient(value: string): value is SsoClient {
 
 function allowedOriginsFor(client: SsoClient): string[] {
   switch (client) {
+    case "coretap":
+      return coretapReturnOrigins();
     case "nexustap":
       return nexustapReturnOrigins();
     case "signaltap":
@@ -47,6 +49,7 @@ function allowedOriginsFor(client: SsoClient): string[] {
 
 function callbackPathFor(client: SsoClient): string {
   switch (client) {
+    case "coretap":
     case "nexustap":
     case "signaltap":
       return "/auth/authtap/callback";

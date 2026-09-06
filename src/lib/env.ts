@@ -48,3 +48,11 @@ export function signaltapReturnOrigins(): string[] {
     .filter(Boolean);
   return [...new Set(["http://localhost:3001", ...extras])];
 }
+
+export function coretapReturnOrigins(): string[] {
+  const extras = required("CORETAP_RETURN_ORIGINS")
+    .split(",")
+    .map((origin) => origin.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+  return [...new Set(["http://localhost:6100", ...extras])];
+}

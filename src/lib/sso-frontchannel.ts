@@ -1,30 +1,47 @@
 import "server-only";
 
-import { nexustapReturnOrigins, signaltapReturnOrigins } from "@/lib/env";
+import { coretapReturnOrigins, nexustapReturnOrigins, signaltapReturnOrigins } from "@/lib/env";
 
+const CORETAP_FRONTCHANNEL_PATH = "/api/auth/sso/authtap/frontchannel-logout";
 const NEXUSTAP_FRONTCHANNEL_PATH = "/api/auth/sso/authtap/frontchannel-logout";
 const SIGNALTAP_FRONTCHANNEL_PATH = "/auth/sso/authtap/frontchannel-logout";
 
 export type FrontchannelApp = { origin: string; path: string };
 
-function nexustapAppOrigin(): string {
-  const fromEnv = (process.env.NEXUSTAP_RETURN_ORIGINS ?? "")
+function firstConfiguredOrigin(raw: string | undefined, fallbacks: string[], prefer: string, lastResort: string): string {
+  const fromEnv = (raw ?? "")
     .split(",")
     .map((origin) => origin.trim().replace(/\/$/, ""))
     .find(Boolean);
   if (fromEnv) return fromEnv;
-  const known = nexustapReturnOrigins();
-  return known.find((origin) => origin.includes("3002")) ?? known[0] ?? "http://localhost:3002";
+  return fallbacks.find((origin) => origin.includes(prefer)) ?? fallbacks[0] ?? lastResort;
+}
+
+function coretapAppOrigin(): string {
+  return firstConfiguredOrigin(
+    process.env.CORETAP_RETURN_ORIGINS,
+    coretapReturnOrigins(),
+    "6100",
+    "http://localhost:6100",
+  );
+}
+
+function nexustapAppOrigin(): string {
+  return firstConfiguredOrigin(
+    process.env.NEXUSTAP_RETURN_ORIGINS,
+    nexustapReturnOrigins(),
+    "3002",
+    "http://localhost:3002",
+  );
 }
 
 function signaltapAppOrigin(): string {
-  const fromEnv = (process.env.SIGNALTAP_RETURN_ORIGINS ?? "")
-    .split(",")
-    .map((origin) => origin.trim().replace(/\/$/, ""))
-    .find(Boolean);
-  if (fromEnv) return fromEnv;
-  const known = signaltapReturnOrigins();
-  return known.find((origin) => origin.includes("3001")) ?? known[0] ?? "http://localhost:3001";
+  return firstConfiguredOrigin(
+    process.env.SIGNALTAP_RETURN_ORIGINS,
+    signaltapReturnOrigins(),
+    "3001",
+    "http://localhost:3001",
+  );
 }
 
 /**
@@ -34,6 +51,7 @@ function signaltapAppOrigin(): string {
  */
 export function productFrontchannelApps(): FrontchannelApp[] {
   return [
+    { origin: coretapAppOrigin(), path: CORETAP_FRONTCHANNEL_PATH },
     { origin: nexustapAppOrigin(), path: NEXUSTAP_FRONTCHANNEL_PATH },
     { origin: signaltapAppOrigin(), path: SIGNALTAP_FRONTCHANNEL_PATH },
   ];
