@@ -62,9 +62,11 @@ jobs:
             set -e
             cd "${{ secrets.VPS_DEPLOY_PATH }}"
             echo "==> syncing to origin/main"
-            git fetch origin main
-            git reset --hard origin/main
-            git clean -fd
+            # Git 2.35+ refuses a clone whose directory owner is not the SSH user
+            # (root vs www-data). -c avoids writing ~/.gitconfig on every deploy.
+            git -c safe.directory="${{ secrets.VPS_DEPLOY_PATH }}" fetch origin main
+            git -c safe.directory="${{ secrets.VPS_DEPLOY_PATH }}" reset --hard origin/main
+            git -c safe.directory="${{ secrets.VPS_DEPLOY_PATH }}" clean -fd
             echo "==> building authtap"
             docker compose -f docker-compose.yml build authtap
             echo "==> starting authtap"
