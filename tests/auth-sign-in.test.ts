@@ -2,10 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SignJWT } from "jose";
 import { NextRequest } from "next/server";
 
-vi.mock("@/lib/dk-auth", () => ({
-  dkLogin: vi.fn(),
-  dkRegister: vi.fn(),
-}));
+vi.mock("@/lib/dk-auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/dk-auth")>();
+  return {
+    ...actual,
+    dkLogin: vi.fn(),
+    dkRegister: vi.fn(),
+  };
+});
 
 vi.mock("@/lib/sso-handoff", () => ({
   handoffToProduct: vi.fn(),
@@ -109,9 +113,31 @@ describe("POST /api/auth/email", () => {
     );
 
     expect(res.status).toBe(303);
-    expect(res.headers.get("location")).toBe("http://localhost:3004/login");
+    const location = new URL(res.headers.get("location") ?? "");
+    expect(location.origin + location.pathname).toBe("http://localhost:3004/login");
+    expect(location.searchParams.get("client")).toBe("signaltap");
+    expect(location.searchParams.get("return_to")).toBe("http://localhost:3001/auth/authtap/callback");
+    expect(location.searchParams.get("state")).toBe("state-token-1");
     expect(res.cookies.get("at_pending_email")?.value).toBe("login:fancy@example.com");
-    expect(res.cookies.get(CONTINUE_COOKIE)).toBeUndefined();
+    expect(res.cookies.get(CONTINUE_COOKIE)?.value).toBeTruthy();
+  });
+
+  it("keeps CoreTAP continue fields from the email form on /login", async () => {
+    const res = await postEmail(
+      formRequest("http://localhost:3004/api/auth/email", {
+        mode: "login",
+        email: "fancy@example.com",
+        client: "coretap",
+        return_to: "http://localhost:3000/auth/authtap/callback",
+        state: "state-token-1",
+      }),
+    );
+
+    expect(res.status).toBe(303);
+    const location = new URL(res.headers.get("location") ?? "");
+    expect(location.searchParams.get("client")).toBe("coretap");
+    expect(location.searchParams.get("return_to")).toBe("http://localhost:3000/auth/authtap/callback");
+    expect(location.searchParams.get("state")).toBe("state-token-1");
   });
 });
 
@@ -131,11 +157,16 @@ describe("POST /api/auth/sign-in", () => {
     const res = await postSignIn(
       formRequest(
         "http://localhost:3004/api/auth/sign-in",
-        { mode: "login", password: "secret" },
+        { mode: "login", password: "secret", turnstileToken: "cf-tok" },
         `at_pending_email=login:fancy@example.com; ${CONTINUE_COOKIE}=${continueToken}`,
       ),
     );
 
+    expect(dkLogin).toHaveBeenCalledWith(
+      "fancy@example.com",
+      "secret",
+      expect.objectContaining({ turnstileToken: "cf-tok" }),
+    );
     expect(res.status).toBe(303);
     const location = new URL(res.headers.get("location") ?? "");
     expect(location.origin + location.pathname).toBe("http://localhost:3001/auth/authtap/callback");
@@ -149,6 +180,29 @@ describe("POST /api/auth/sign-in", () => {
 
     expect(res.cookies.get("at_session")?.value).toBeTruthy();
     expect(res.cookies.get("at_pending_email")?.value).toBe("");
+  });
+
+  it("303s to the product from form continue fields when the cookie is missing", async () => {
+    vi.mocked(dkLogin).mockResolvedValue({ ok: true, token: "core-token", user });
+    vi.mocked(handoffToProduct).mockResolvedValue({ ok: true, token: "product-token", user });
+    vi.mocked(signHandoffCode).mockResolvedValue("handoff-code");
+
+    const res = await postSignIn(
+      formRequest("http://localhost:3004/api/auth/sign-in", {
+        mode: "login",
+        password: "secret",
+        turnstileToken: "cf-tok",
+        client: "coretap",
+        return_to: "http://localhost:3000/auth/authtap/callback",
+        state: "state-token-1",
+      }, "at_pending_email=login:fancy@example.com"),
+    );
+
+    expect(res.status).toBe(303);
+    const location = new URL(res.headers.get("location") ?? "");
+    expect(location.origin + location.pathname).toBe("http://localhost:3000/auth/authtap/callback");
+    expect(location.searchParams.get("state")).toBe("state-token-1");
+    expect(handoffToProduct).toHaveBeenCalledWith({ token: "core-token", user }, "coretap");
     expect(res.cookies.get(CONTINUE_COOKIE)?.value).toBe("");
   });
 });

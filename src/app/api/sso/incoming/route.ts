@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readAccountStore } from "@/lib/session";
+import { publicUrl } from "@/lib/public-origin";
+import { SESSION_COOKIE, verifyAccountStore } from "@/lib/session";
 import { attachContinueCookie, parseContinueInput } from "@/lib/sso-continue";
 import { handoffToProduct, signHandoffCode } from "@/lib/sso-handoff";
 
@@ -13,18 +14,24 @@ export async function GET(req: NextRequest) {
     state: req.nextUrl.searchParams.get("state") ?? "",
   });
   if (!request) {
-    return NextResponse.redirect(new URL("/account", req.url));
+    return NextResponse.redirect(publicUrl("/account", req));
   }
 
-  const store = await readAccountStore();
+  // Read at_session from this request. cookies() in a Route Handler can miss
+  // it, which sent an already-signed-in user to /login and then /account.
+  const store = await verifyAccountStore(req.cookies.get(SESSION_COOKIE)?.value);
   if (!store) {
-    const res = NextResponse.redirect(new URL("/login", req.url));
+    const login = publicUrl("/login", req);
+    login.searchParams.set("client", request.client);
+    login.searchParams.set("return_to", request.returnTo);
+    login.searchParams.set("state", request.state);
+    const res = NextResponse.redirect(login);
     await attachContinueCookie(res, request);
     return res;
   }
 
   if (store.accounts.length !== 1) {
-    const res = NextResponse.redirect(new URL("/continue", req.url));
+    const res = NextResponse.redirect(publicUrl("/continue", req));
     await attachContinueCookie(res, request);
     return res;
   }
@@ -32,7 +39,7 @@ export async function GET(req: NextRequest) {
   const handoff = await handoffToProduct(store.accounts[0], request.client);
   if (!handoff.ok) {
     const res = NextResponse.redirect(
-      new URL(`/continue?error=${encodeURIComponent(handoff.error)}`, req.url),
+      publicUrl(`/continue?error=${encodeURIComponent(handoff.error)}`, req),
     );
     await attachContinueCookie(res, request);
     return res;

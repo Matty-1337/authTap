@@ -18,5 +18,5 @@ export async function chooseAccount(formData: FormData) {
   const userId = Number(formData.get("userId"));
   if (!Number.isFinite(userId) || userId <= 0) redirect("/account");
   await switchAccount(userId);
-  redirect("/account");
+  redirect(await afterAuthPath());
 }

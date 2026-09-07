@@ -1,35 +1,63 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readAccountStore } from "@/lib/session";
-import { productHandoffUrl, readContinueRequest } from "@/lib/sso-continue";
+import { publicUrl } from "@/lib/public-origin";
+import { SESSION_COOKIE, verifyAccountStore } from "@/lib/session";
+import {
+  CONTINUE_COOKIE,
+  parseContinueCookie,
+  parseContinueInput,
+  productHandoffUrl,
+} from "@/lib/sso-continue";
 import { handoffToProduct, signHandoffCode } from "@/lib/sso-handoff";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
-  const request = await readContinueRequest();
+async function finish(req: NextRequest, userId?: number) {
+  const fromCookie = await parseContinueCookie(req.cookies.get(CONTINUE_COOKIE)?.value);
+  const fromQuery = parseContinueInput({
+    client: req.nextUrl.searchParams.get("client") ?? "",
+    return_to: req.nextUrl.searchParams.get("return_to") ?? "",
+    state: req.nextUrl.searchParams.get("state") ?? "",
+  });
+  const request = fromCookie ?? fromQuery;
   if (!request) {
-    return NextResponse.redirect(new URL("/account", req.url));
+    return NextResponse.redirect(publicUrl("/account", req));
   }
 
-  const store = await readAccountStore();
+  const store = await verifyAccountStore(req.cookies.get(SESSION_COOKIE)?.value);
   if (!store) {
-    return NextResponse.redirect(new URL("/login", req.url));
-  }
-  if (store.accounts.length !== 1) {
-    return NextResponse.redirect(new URL("/continue", req.url));
+    return NextResponse.redirect(publicUrl("/login", req));
   }
 
-  const handoff = await handoffToProduct(store.accounts[0], request.client);
+  const account =
+    userId && Number.isFinite(userId)
+      ? store.accounts.find((entry) => entry.user.id === userId)
+      : store.accounts.length === 1
+        ? store.accounts[0]
+        : null;
+  if (!account) {
+    return NextResponse.redirect(publicUrl("/continue", req));
+  }
+
+  const handoff = await handoffToProduct(account, request.client);
   if (!handoff.ok) {
-    const dest = new URL("/continue", req.url);
+    const dest = publicUrl("/continue", req);
     dest.searchParams.set("error", handoff.error);
     return NextResponse.redirect(dest);
   }
 
   const code = await signHandoffCode({ request, token: handoff.token, user: handoff.user });
-  const dest = productHandoffUrl(request, code);
-  const res = NextResponse.redirect(dest);
+  const res = NextResponse.redirect(productHandoffUrl(request, code), 303);
   res.cookies.delete("at_continue");
   return res;
+}
+
+export async function GET(req: NextRequest) {
+  return finish(req);
+}
+
+export async function POST(req: NextRequest) {
+  const form = await req.formData().catch(() => null);
+  const userId = Number(form?.get("userId"));
+  return finish(req, Number.isFinite(userId) && userId > 0 ? userId : undefined);
 }

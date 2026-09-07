@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { publicOrigin, publicUrl } from "@/lib/public-origin";
 import { removeAccount, removeActiveAccount } from "@/lib/session";
 import { afterLastAccountSignOutUrl } from "@/lib/sso-frontchannel";
 import { clearContinueRequest } from "@/lib/sso-continue";
@@ -17,10 +18,10 @@ export async function POST(request: Request) {
 
   if (stillSignedIn) {
     await clearContinueRequest();
-    return NextResponse.redirect(new URL("/account", request.url), 303);
+    return NextResponse.redirect(publicUrl("/account", request), 303);
   }
 
-  const dest = afterLastAccountSignOutUrl(new URL(request.url).origin);
+  const dest = afterLastAccountSignOutUrl(publicOrigin(request));
   await clearContinueRequest();
   return NextResponse.redirect(dest, 303);
 }

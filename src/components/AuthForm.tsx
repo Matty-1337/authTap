@@ -2,12 +2,15 @@
 
 import { useState } from "react";
 import { BrandBusy } from "@/components/BrandBusy";
+import { TurnstileWidget } from "@/components/TurnstileWidget";
 import type { AuthMode } from "@/lib/auth-types";
+import { isTurnstileEnabled } from "@/lib/turnstile";
 
 type AuthFormProps = {
   mode: AuthMode;
   email: string;
   error: string;
+  continueRequest?: { client: string; returnTo: string; state: string } | null;
 };
 
 const fieldClass =
@@ -15,13 +18,21 @@ const fieldClass =
 const buttonClass =
   "flex h-12 w-full items-center justify-center rounded-xl bg-[#9B6DFF] text-[15px] font-semibold text-[#161826] disabled:opacity-60";
 
-export function AuthForm({ mode, email: pendingEmail, error }: AuthFormProps) {
+export function AuthForm({
+  mode,
+  email: pendingEmail,
+  error,
+  continueRequest = null,
+}: AuthFormProps) {
   const step = pendingEmail ? "password" : "email";
   const [email, setEmail] = useState(pendingEmail);
   const [password, setPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
   const copy = copyFor(mode);
+  const turnstileOn = isTurnstileEnabled();
+  const waitingOnTurnstile = turnstileOn && !turnstileToken;
 
   if (step === "email") {
     return (
@@ -35,6 +46,13 @@ export function AuthForm({ mode, email: pendingEmail, error }: AuthFormProps) {
           onSubmit={() => setBusy(true)}
         >
           <input type="hidden" name="mode" value={mode} />
+          {continueRequest ? (
+            <>
+              <input type="hidden" name="client" value={continueRequest.client} />
+              <input type="hidden" name="return_to" value={continueRequest.returnTo} />
+              <input type="hidden" name="state" value={continueRequest.state} />
+            </>
+          ) : null}
           <label className="sr-only" htmlFor="email">
             Email
           </label>
@@ -67,11 +85,26 @@ export function AuthForm({ mode, email: pendingEmail, error }: AuthFormProps) {
         method="post"
         noValidate
         className="flex w-full flex-col gap-3"
-        onSubmit={() => setBusy(true)}
+        onSubmit={(event) => {
+          if (waitingOnTurnstile) {
+            event.preventDefault();
+            return;
+          }
+          setBusy(true);
+        }}
       >
         <input type="hidden" name="mode" value={mode} />
+        {continueRequest ? (
+          <>
+            <input type="hidden" name="client" value={continueRequest.client} />
+            <input type="hidden" name="return_to" value={continueRequest.returnTo} />
+            <input type="hidden" name="state" value={continueRequest.state} />
+          </>
+        ) : null}
+        <input type="hidden" name="turnstileToken" value={turnstileToken} />
+        <input type="hidden" name="cf-turnstile-response" value={turnstileToken} />
         <input type="email" name="email" value={pendingEmail} hidden autoComplete="username" readOnly />
-        <a href={`/auth/back?mode=${mode}`} className="self-start text-[13px] text-[#9B6DFF]">
+        <a href={backHref(mode, continueRequest)} className="self-start text-[13px] text-[#9B6DFF]">
           ← {pendingEmail}
         </a>
         <label className="sr-only" htmlFor="password">
@@ -113,12 +146,27 @@ export function AuthForm({ mode, email: pendingEmail, error }: AuthFormProps) {
           />
         )}
         {error ? <p className="text-[13px] text-[#FF8A80]">{error}</p> : null}
-        <button type="submit" className={buttonClass} disabled={busy}>
+        <TurnstileWidget onVerify={setTurnstileToken} className="flex justify-center" />
+        <button type="submit" className={buttonClass} disabled={busy || waitingOnTurnstile}>
           {copy.submit}
         </button>
       </form>
     </>
   );
+}
+
+function backHref(
+  mode: AuthMode,
+  continueRequest: { client: string; returnTo: string; state: string } | null,
+): string {
+  const dest = new URL("/auth/back", "http://authtap.local");
+  dest.searchParams.set("mode", mode);
+  if (continueRequest) {
+    dest.searchParams.set("client", continueRequest.client);
+    dest.searchParams.set("return_to", continueRequest.returnTo);
+    dest.searchParams.set("state", continueRequest.state);
+  }
+  return `${dest.pathname}${dest.search}`;
 }
 
 function copyFor(mode: AuthMode) {

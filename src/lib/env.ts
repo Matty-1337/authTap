@@ -6,7 +6,7 @@ function required(name: string, fallback?: string): string {
 }
 
 export function dkBackendUrl(): string {
-  const fallback = process.env.NODE_ENV === "production" ? "https://api.deltakinetics.io" : "http://localhost:9000";
+  const fallback = process.env.NODE_ENV === "production" ? "https://deltakinetics.io" : "http://localhost:9000";
   return required("DK_BACKEND_URL", fallback).replace(/\/$/, "");
 }
 
@@ -47,4 +47,12 @@ export function signaltapReturnOrigins(): string[] {
     .map((origin) => origin.trim().replace(/\/$/, ""))
     .filter(Boolean);
   return [...new Set(["http://localhost:3001", ...extras])];
+}
+
+export function coretapReturnOrigins(): string[] {
+  const extras = required("CORETAP_RETURN_ORIGINS")
+    .split(",")
+    .map((origin) => origin.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+  return [...new Set(["http://localhost:6100", "http://localhost:3000", "http://core-tap.local:3000", ...extras])];
 }

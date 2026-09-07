@@ -1,6 +1,6 @@
 import "server-only";
 
-import { dkLogin, dkRegister } from "@/lib/dk-auth";
+import { dkLogin, dkRegister, type DkClientContext } from "@/lib/dk-auth";
 import type { AuthMode } from "@/lib/auth-types";
 import {
   mergeAccountIntoStore,
@@ -16,6 +16,7 @@ export type PasswordSignInInput = {
   pendingEmail: string;
   continueRequest: ContinueRequest | null;
   existingStore: AccountStore | null;
+  client?: DkClientContext;
 };
 
 export type PasswordSignInResult =
@@ -45,7 +46,10 @@ export async function completePasswordSignIn(input: PasswordSignInInput): Promis
     return { ok: false, error: "Use at least 8 characters." };
   }
 
-  const result = input.mode === "login" ? await dkLogin(email, password) : await dkRegister(email, password);
+  const result =
+    input.mode === "login"
+      ? await dkLogin(email, password, input.client)
+      : await dkRegister(email, password, input.client);
   if (!result.ok) return { ok: false, error: result.error };
 
   const account = { token: result.token, user: result.user };
