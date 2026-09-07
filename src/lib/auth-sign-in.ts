@@ -1,6 +1,6 @@
 import "server-only";
 
-import { dkLogin, dkRegister, type DkClientContext } from "@/lib/dk-auth";
+import { dkLogin, dkRegister, isVerifiedAuth, type DkClientContext } from "@/lib/dk-auth";
 import type { AuthMode } from "@/lib/auth-types";
 import {
   mergeAccountIntoStore,
@@ -21,8 +21,10 @@ export type PasswordSignInInput = {
 
 export type PasswordSignInResult =
   | { ok: false; error: string }
+  | { ok: true; needsVerification: true; email: string }
   | {
       ok: true;
+      needsVerification?: false;
       account: SessionData;
       store: AccountStore;
       dest: SignInDestination;
@@ -51,6 +53,7 @@ export async function completePasswordSignIn(input: PasswordSignInInput): Promis
       ? await dkLogin(email, password, input.client)
       : await dkRegister(email, password, input.client);
   if (!result.ok) return { ok: false, error: result.error };
+  if (!isVerifiedAuth(result)) return { ok: true, needsVerification: true, email: result.email };
 
   const account = { token: result.token, user: result.user };
   const merged = mergeAccountIntoStore(account, input.existingStore);

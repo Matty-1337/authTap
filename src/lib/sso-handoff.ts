@@ -49,8 +49,10 @@ export async function handoffToProduct(account: HandoffAccount, client: SsoClien
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
     const message =
-      (typeof data.message === "string" && data.message) ||
-      (res.status === 403 ? "This account does not have access." : "Could not continue into the app.");
+      data.reason === "email_unverified"
+        ? "Verify your email to finish creating this account."
+        : (typeof data.message === "string" && data.message) ||
+          (res.status === 403 ? "This account does not have access." : "Could not continue into the app.");
     return { ok: false, error: message };
   }
 

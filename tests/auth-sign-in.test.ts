@@ -19,7 +19,7 @@ vi.mock("@/lib/sso-handoff", () => ({
 import { POST as postEmail } from "@/app/api/auth/email/route";
 import { POST as postSignIn } from "@/app/api/auth/sign-in/route";
 import { completePasswordSignIn } from "@/lib/auth-sign-in";
-import { dkLogin } from "@/lib/dk-auth";
+import { dkLogin, dkRegister } from "@/lib/dk-auth";
 import { sessionSecret } from "@/lib/env";
 import { CONTINUE_COOKIE } from "@/lib/sso-continue";
 import { handoffToProduct, signHandoffCode } from "@/lib/sso-handoff";
@@ -58,8 +58,32 @@ function formRequest(url: string, fields: Record<string, string>, cookie = ""): 
 describe("completePasswordSignIn", () => {
   beforeEach(() => {
     vi.mocked(dkLogin).mockReset();
+    vi.mocked(dkRegister).mockReset();
     vi.mocked(handoffToProduct).mockReset();
     vi.mocked(signHandoffCode).mockReset();
+  });
+
+  it("keeps an unverified register out of the AuthTAP session", async () => {
+    vi.mocked(dkRegister).mockResolvedValue({
+      ok: true,
+      needsVerification: true,
+      email: "new@example.com",
+    });
+
+    await expect(
+      completePasswordSignIn({
+        mode: "register",
+        password: "secret123",
+        pendingEmail: "new@example.com",
+        continueRequest,
+        existingStore: null,
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      needsVerification: true,
+      email: "new@example.com",
+    });
+    expect(handoffToProduct).not.toHaveBeenCalled();
   });
 
   it("uses the pre-read continue request instead of re-reading cookies", async () => {
@@ -76,7 +100,7 @@ describe("completePasswordSignIn", () => {
     });
 
     expect(result.ok).toBe(true);
-    if (!result.ok) return;
+    if (!result.ok || result.needsVerification) return;
     expect(handoffToProduct).toHaveBeenCalledWith({ token: "core-token", user }, "signaltap");
     expect(result.dest.clearContinue).toBe(true);
     const url = new URL(result.dest.url);
@@ -95,7 +119,7 @@ describe("completePasswordSignIn", () => {
       existingStore: null,
     });
     expect(result.ok).toBe(true);
-    if (!result.ok) return;
+    if (!result.ok || result.needsVerification) return;
     expect(result.dest).toEqual({ url: "/account", clearContinue: false });
     expect(handoffToProduct).not.toHaveBeenCalled();
   });
@@ -144,6 +168,7 @@ describe("POST /api/auth/email", () => {
 describe("POST /api/auth/sign-in", () => {
   beforeEach(() => {
     vi.mocked(dkLogin).mockReset();
+    vi.mocked(dkRegister).mockReset();
     vi.mocked(handoffToProduct).mockReset();
     vi.mocked(signHandoffCode).mockReset();
   });
@@ -204,5 +229,28 @@ describe("POST /api/auth/sign-in", () => {
     expect(location.searchParams.get("state")).toBe("state-token-1");
     expect(handoffToProduct).toHaveBeenCalledWith({ token: "core-token", user }, "coretap");
     expect(res.cookies.get(CONTINUE_COOKIE)?.value).toBe("");
+  });
+
+  it("does not write a session when register still needs email verification", async () => {
+    vi.mocked(dkRegister).mockResolvedValue({
+      ok: true,
+      needsVerification: true,
+      email: "new@example.com",
+    });
+
+    const res = await postSignIn(
+      formRequest(
+        "http://localhost:3004/api/auth/sign-in",
+        { mode: "register", password: "secret123" },
+        "at_pending_email=register:new@example.com",
+      ),
+    );
+
+    expect(res.status).toBe(303);
+    const location = new URL(res.headers.get("location") ?? "");
+    expect(location.origin + location.pathname).toBe("http://localhost:3004/verify-email");
+    expect(res.cookies.get("at_session")?.value).toBeUndefined();
+    expect(res.cookies.get("at_pending_verify")?.value).toBe("new@example.com");
+    expect(handoffToProduct).not.toHaveBeenCalled();
   });
 });

@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   PENDING_EMAIL_COOKIE,
+  attachPendingVerifyCookie,
   clearPendingEmailCookie,
   parsePendingEmail,
   pathFor,
+  verifyEmailPath,
 } from "@/lib/auth-flow";
 import { completePasswordSignIn, redirectLocation } from "@/lib/auth-sign-in";
 import type { AuthMode } from "@/lib/auth-types";
@@ -17,6 +19,7 @@ import {
 import { publicOrigin, publicUrl } from "@/lib/public-origin";
 import {
   CONTINUE_COOKIE,
+  attachContinueCookie,
   clearContinueCookie,
   applyContinueParams,
   parseContinueCookie,
@@ -28,6 +31,13 @@ export const dynamic = "force-dynamic";
 
 function modeFrom(form: FormData): AuthMode {
   return form.get("mode") === "register" ? "register" : "login";
+}
+
+function destKind(url: string): string {
+  if (url.includes("/auth/authtap/callback")) return "product-callback";
+  if (url.startsWith("/account")) return "account";
+  if (url.startsWith("/continue")) return "continue";
+  return "other";
 }
 
 export async function POST(req: NextRequest) {
@@ -55,10 +65,24 @@ export async function POST(req: NextRequest) {
     existingStore,
     client: clientContextFrom(req, turnstileTokenFromForm(form)),
   });
+  console.info("[authtap-sso] sign-in dest", {
+    formClient: typeof form.get("client") === "string" ? form.get("client") : "",
+    hasContinue: Boolean(continueRequest),
+    dest: result.ok ? (result.needsVerification ? "verify-email" : destKind(result.dest.url)) : "error",
+  });
 
   if (!result.ok) {
     const dest = applyContinueParams(publicUrl(pathFor(mode, result.error), req), continueRequest);
     return NextResponse.redirect(dest, 303);
+  }
+
+  if (result.needsVerification) {
+    const dest = applyContinueParams(publicUrl(verifyEmailPath(), req), continueRequest);
+    const res = NextResponse.redirect(dest, 303);
+    attachPendingVerifyCookie(res, result.email);
+    clearPendingEmailCookie(res);
+    if (continueRequest) await attachContinueCookie(res, continueRequest);
+    return res;
   }
 
   const res = NextResponse.redirect(redirectLocation(result.dest.url, publicOrigin(req)), 303);

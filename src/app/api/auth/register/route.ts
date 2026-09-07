@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { clientContextFrom, dkRegister } from "@/lib/dk-auth";
+import { clientContextFrom, dkRegister, isVerifiedAuth } from "@/lib/dk-auth";
 import { writeSession } from "@/lib/session";
 
 export async function POST(request: Request) {
@@ -20,6 +20,9 @@ export async function POST(request: Request) {
   const result = await dkRegister(email, password, clientContextFrom(request, body.turnstileToken ?? ""));
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
+  }
+  if (!isVerifiedAuth(result)) {
+    return NextResponse.json({ ok: false, requires_verification: true, email: result.email }, { status: 201 });
   }
 
   const session = await writeSession({ token: result.token, user: result.user });
