@@ -14,20 +14,17 @@ type VerifyEmailFormProps = {
 export function VerifyEmailForm({ email, error, continueRequest = null }: VerifyEmailFormProps) {
   const [code, setCode] = useState<string[]>(Array(CODE_LENGTH).fill(""));
   const [busy, setBusy] = useState(false);
-  const [localError, setLocalError] = useState(error);
+  const [clientError, setClientError] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [leaving, setLeaving] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const submittedCodeRef = useRef<string | null>(null);
+  const displayError = clientError ?? error;
 
   useEffect(() => {
     inputRefs.current[0]?.focus();
   }, []);
-
-  useEffect(() => {
-    setLocalError(error);
-  }, [error]);
 
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -52,7 +49,7 @@ export function VerifyEmailForm({ email, error, continueRequest = null }: Verify
     if (submittedCodeRef.current === next) return;
     submittedCodeRef.current = next;
     setBusy(true);
-    setLocalError("");
+    setClientError("");
     const body = new FormData();
     body.set("email", email);
     body.set("code", next);
@@ -77,13 +74,13 @@ export function VerifyEmailForm({ email, error, continueRequest = null }: Verify
         window.location.assign(data.url);
         return;
       }
-      setLocalError(data.error || "Invalid or expired verification code.");
+      setClientError(data.error || "Invalid or expired verification code.");
       submittedCodeRef.current = null;
       const cleared = applyDigits([]);
       setCode(cleared);
       inputRefs.current[0]?.focus();
     } catch {
-      setLocalError("Could not reach AuthTAP. Try again.");
+      setClientError("Could not reach AuthTAP. Try again.");
       submittedCodeRef.current = null;
     } finally {
       setBusy(false);
@@ -164,9 +161,9 @@ export function VerifyEmailForm({ email, error, continueRequest = null }: Verify
         </div>
 
         {busy ? <p className="text-[13px] text-[#F2F2F5]/45">Verifying...</p> : null}
-        {localError ? (
+        {displayError ? (
           <div className="mb-4 w-full rounded-lg bg-[rgba(255,138,128,0.12)] p-3 text-[13px] text-[#FF8A80]">
-            {localError}
+            {displayError}
           </div>
         ) : null}
       </div>
@@ -177,7 +174,7 @@ export function VerifyEmailForm({ email, error, continueRequest = null }: Verify
         onClick={() => {
           if (resendCooldown > 0 || resending) return;
           setResending(true);
-          setLocalError("");
+          setClientError("");
           const body = new FormData();
           body.set("email", email);
           if (continueRequest) {
@@ -202,13 +199,13 @@ export function VerifyEmailForm({ email, error, continueRequest = null }: Verify
                 return;
               }
               if (!data.ok) {
-                setLocalError(data.error || "Could not resend the code.");
+                setClientError(data.error || "Could not resend the code.");
                 return;
               }
               setResendCooldown(60);
             })
             .catch(() => {
-              setLocalError("Could not resend the code.");
+              setClientError("Could not resend the code.");
             })
             .finally(() => {
               setResending(false);
