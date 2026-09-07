@@ -188,6 +188,11 @@ export async function clearSession(): Promise<void> {
   jar.delete(ADDING_COOKIE);
 }
 
+export function clearSessionCookies(res: NextResponse): void {
+  res.cookies.set(SESSION_COOKIE, "", { ...cookieBase(), maxAge: 0 });
+  res.cookies.set(ADDING_COOKIE, "", { ...cookieBase(), maxAge: 0 });
+}
+
 export async function beginAddAccount(): Promise<void> {
   const jar = await cookies();
   jar.set(ADDING_COOKIE, "1", { ...cookieBase(), maxAge: 60 * 20 });

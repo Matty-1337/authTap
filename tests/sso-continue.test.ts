@@ -87,6 +87,12 @@ describe("AuthTAP SSO continue — coretap client", () => {
     expect(isAllowedReturnTo("coretap", "https://coretap.deltakinetics.io/auth/authtap/callback")).toBe(true);
   });
 
+  it("accepts the public core-tap.com apex, but not venue subdomains", () => {
+    expect(isAllowedReturnTo("coretap", "https://core-tap.com/auth/authtap/callback")).toBe(true);
+    expect(isAllowedReturnTo("coretap", "https://www.core-tap.com/auth/authtap/callback")).toBe(true);
+    expect(isAllowedReturnTo("coretap", "https://joes.core-tap.com/auth/authtap/callback")).toBe(false);
+  });
+
   it("keeps continue fields on the AuthTAP login URL after the email step", () => {
     const dest = applyContinueParams(new URL("http://localhost:3004/login"), {
       client: "coretap",

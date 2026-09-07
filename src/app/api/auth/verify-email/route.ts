@@ -3,6 +3,7 @@ import {
   attachPendingVerifyCookie,
   clearPendingVerifyCookie,
   parsePendingVerifyEmail,
+  pathFor,
   verifyEmailPath,
 } from "@/lib/auth-flow";
 import { clientContextFrom, dkVerifyEmail, isVerifiedAuth } from "@/lib/dk-auth";
@@ -19,6 +20,10 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function wantsJson(req: NextRequest): boolean {
+  return (req.headers.get("accept") ?? "").includes("application/json");
+}
+
 export async function POST(req: NextRequest) {
   const form = await req.formData();
   const continueRequest =
@@ -31,9 +36,15 @@ export async function POST(req: NextRequest) {
     String(form.get("email") ?? "").trim().toLowerCase() ||
     parsePendingVerifyEmail(req.cookies.get("at_pending_verify")?.value);
   const code = String(form.get("code") ?? "").replace(/\D/g, "").slice(0, 6);
+  const json = wantsJson(req);
 
   if (!email || code.length !== 6) {
     const dest = applyContinueParams(publicUrl(verifyEmailPath("Enter the 6-digit code."), req), continueRequest);
+    if (json) {
+      const res = NextResponse.json({ ok: false, error: "Enter the 6-digit code." });
+      if (email) attachPendingVerifyCookie(res, email);
+      return res;
+    }
     const res = NextResponse.redirect(dest, 303);
     if (email) attachPendingVerifyCookie(res, email);
     if (continueRequest) await attachContinueCookie(res, continueRequest);
@@ -42,10 +53,25 @@ export async function POST(req: NextRequest) {
 
   const result = await dkVerifyEmail(email, code, clientContextFrom(req));
   if (!isVerifiedAuth(result)) {
+    if (result.ok === false && result.alreadyVerified) {
+      const dest = applyContinueParams(publicUrl(pathFor("login", result.error), req), continueRequest);
+      if (json) {
+        return NextResponse.json({ ok: false, alreadyVerified: true, error: result.error, url: dest.toString() });
+      }
+      return NextResponse.redirect(dest, 303);
+    }
     const dest = applyContinueParams(
       publicUrl(verifyEmailPath(result.ok ? "Enter the 6-digit code." : result.error), req),
       continueRequest,
     );
+    if (json) {
+      const res = NextResponse.json({
+        ok: false,
+        error: result.ok ? "Enter the 6-digit code." : result.error,
+      });
+      attachPendingVerifyCookie(res, email);
+      return res;
+    }
     const res = NextResponse.redirect(dest, 303);
     attachPendingVerifyCookie(res, email);
     if (continueRequest) await attachContinueCookie(res, continueRequest);
@@ -60,11 +86,19 @@ export async function POST(req: NextRequest) {
   });
   if (!finished.ok) {
     const dest = applyContinueParams(publicUrl(verifyEmailPath(finished.error), req), continueRequest);
+    if (json) return NextResponse.json({ ok: false, error: finished.error });
     return NextResponse.redirect(dest, 303);
   }
 
+  if (json) {
+    const res = NextResponse.json({ ok: true, url: finished.url });
+    await finished.apply(res);
+    clearPendingVerifyCookie(res);
+    return res;
+  }
+
   const res = NextResponse.redirect(finished.url, 303);
-  finished.apply(res);
+  await finished.apply(res);
   clearPendingVerifyCookie(res);
   return res;
 }

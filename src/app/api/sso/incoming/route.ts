@@ -14,6 +14,16 @@ export async function GET(req: NextRequest) {
     state: req.nextUrl.searchParams.get("state") ?? "",
   });
   if (!request) {
+    let returnHost = "";
+    try {
+      returnHost = new URL(req.nextUrl.searchParams.get("return_to") ?? "").host;
+    } catch {
+      returnHost = "";
+    }
+    console.info("[authtap-sso] incoming rejected", {
+      client: req.nextUrl.searchParams.get("client") ?? "",
+      returnHost,
+    });
     return NextResponse.redirect(publicUrl("/account", req));
   }
 
@@ -36,7 +46,8 @@ export async function GET(req: NextRequest) {
     return res;
   }
 
-  const handoff = await handoffToProduct(store.accounts[0], request.client);
+  const account = store.accounts[0];
+  const handoff = await handoffToProduct(account, request.client);
   if (!handoff.ok) {
     const res = NextResponse.redirect(
       publicUrl(`/continue?error=${encodeURIComponent(handoff.error)}`, req),

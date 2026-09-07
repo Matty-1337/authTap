@@ -8,6 +8,8 @@ vi.mock("@/lib/dk-auth", async (importOriginal) => {
     ...actual,
     dkLogin: vi.fn(),
     dkRegister: vi.fn(),
+    dkResendVerification: vi.fn(),
+    dkAccountVerified: vi.fn(),
   };
 });
 
@@ -17,9 +19,10 @@ vi.mock("@/lib/sso-handoff", () => ({
 }));
 
 import { POST as postEmail } from "@/app/api/auth/email/route";
+import { GET as leaveVerify } from "@/app/api/auth/leave-verify/route";
 import { POST as postSignIn } from "@/app/api/auth/sign-in/route";
 import { completePasswordSignIn } from "@/lib/auth-sign-in";
-import { dkLogin, dkRegister } from "@/lib/dk-auth";
+import { dkAccountVerified, dkLogin, dkRegister, dkResendVerification } from "@/lib/dk-auth";
 import { sessionSecret } from "@/lib/env";
 import { CONTINUE_COOKIE } from "@/lib/sso-continue";
 import { handoffToProduct, signHandoffCode } from "@/lib/sso-handoff";
@@ -59,6 +62,8 @@ describe("completePasswordSignIn", () => {
   beforeEach(() => {
     vi.mocked(dkLogin).mockReset();
     vi.mocked(dkRegister).mockReset();
+    vi.mocked(dkResendVerification).mockReset();
+    vi.mocked(dkAccountVerified).mockReset();
     vi.mocked(handoffToProduct).mockReset();
     vi.mocked(signHandoffCode).mockReset();
   });
@@ -84,6 +89,41 @@ describe("completePasswordSignIn", () => {
       email: "new@example.com",
     });
     expect(handoffToProduct).not.toHaveBeenCalled();
+  });
+
+  it("admits register when the returned account is already verified", async () => {
+    vi.mocked(dkRegister).mockResolvedValue({ ok: true, token: "core-token", user });
+    vi.mocked(dkAccountVerified).mockResolvedValue(true);
+
+    const result = await completePasswordSignIn({
+      mode: "register",
+      password: "secret123",
+      pendingEmail: "fancy@example.com",
+      continueRequest: null,
+      existingStore: null,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.needsVerification) return;
+    expect(result.dest).toEqual({ url: "/account", clearContinue: false });
+    expect(dkResendVerification).not.toHaveBeenCalled();
+  });
+
+  it("admits login when the API returns a token", async () => {
+    vi.mocked(dkLogin).mockResolvedValue({ ok: true, token: "core-token", user });
+
+    const result = await completePasswordSignIn({
+      mode: "login",
+      password: "secret",
+      pendingEmail: "fancy@example.com",
+      continueRequest: null,
+      existingStore: null,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.needsVerification) return;
+    expect(result.dest).toEqual({ url: "/account", clearContinue: false });
+    expect(dkResendVerification).not.toHaveBeenCalled();
   });
 
   it("uses the pre-read continue request instead of re-reading cookies", async () => {
@@ -169,6 +209,8 @@ describe("POST /api/auth/sign-in", () => {
   beforeEach(() => {
     vi.mocked(dkLogin).mockReset();
     vi.mocked(dkRegister).mockReset();
+    vi.mocked(dkResendVerification).mockReset();
+    vi.mocked(dkAccountVerified).mockReset();
     vi.mocked(handoffToProduct).mockReset();
     vi.mocked(signHandoffCode).mockReset();
   });
@@ -231,6 +273,23 @@ describe("POST /api/auth/sign-in", () => {
     expect(res.cookies.get(CONTINUE_COOKIE)?.value).toBe("");
   });
 
+  it("writes a session when login returns a token", async () => {
+    vi.mocked(dkLogin).mockResolvedValue({ ok: true, token: "core-token", user });
+
+    const res = await postSignIn(
+      formRequest(
+        "http://localhost:3004/api/auth/sign-in",
+        { mode: "login", password: "secret" },
+        "at_pending_email=login:fancy@example.com",
+      ),
+    );
+
+    expect(res.status).toBe(303);
+    const location = new URL(res.headers.get("location") ?? "");
+    expect(location.origin + location.pathname).toBe("http://localhost:3004/account");
+    expect(res.cookies.get("at_session")?.value).toBeTruthy();
+  });
+
   it("does not write a session when register still needs email verification", async () => {
     vi.mocked(dkRegister).mockResolvedValue({
       ok: true,
@@ -252,5 +311,23 @@ describe("POST /api/auth/sign-in", () => {
     expect(res.cookies.get("at_session")?.value).toBeUndefined();
     expect(res.cookies.get("at_pending_verify")?.value).toBe("new@example.com");
     expect(handoffToProduct).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/auth/leave-verify", () => {
+  it("leaves the verify page for login and clears the pending verify session", async () => {
+    const res = await leaveVerify(
+      new NextRequest(
+        "http://localhost:3004/api/auth/leave-verify?mode=login&client=coretap&return_to=http://localhost:3000/auth/authtap/callback&state=state-token-1",
+        { headers: { cookie: "at_pending_verify=fancy@example.com; at_session=stale" } },
+      ),
+    );
+
+    expect(res.status).toBe(303);
+    const location = new URL(res.headers.get("location") ?? "");
+    expect(location.origin + location.pathname).toBe("http://localhost:3004/login");
+    expect(location.searchParams.get("client")).toBe("coretap");
+    expect(res.cookies.get("at_pending_verify")?.value).toBe("");
+    expect(res.cookies.get("at_session")?.value).toBe("");
   });
 });

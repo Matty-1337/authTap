@@ -54,5 +54,14 @@ export function coretapReturnOrigins(): string[] {
     .split(",")
     .map((origin) => origin.trim().replace(/\/$/, ""))
     .filter(Boolean);
-  return [...new Set(["http://localhost:6100", "http://localhost:3000", "http://core-tap.local:3000", ...extras])];
+  return [
+    ...new Set([
+      "http://localhost:6100",
+      "http://localhost:3000",
+      "http://core-tap.local:3000",
+      "https://core-tap.com",
+      "https://www.core-tap.com",
+      ...extras,
+    ]),
+  ];
 }

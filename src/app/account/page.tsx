@@ -9,10 +9,11 @@ export default async function AccountPage() {
   const store = await readAccountStore();
   if (!store) redirect("/login");
 
+  const active = store.accounts.find((account) => account.user.id === store.activeUserId) ?? store.accounts[0];
+
   // Middleware + /api/sso/complete finish an in-flight CoreTAP continue.
   // Do not read at_continue via cookies() here — that API can miss it.
 
-  const active = store.accounts.find((account) => account.user.id === store.activeUserId) ?? store.accounts[0];
   const others = store.accounts.filter((account) => account.user.id !== active.user.id);
   const canAdd = store.accounts.length < MAX_ACCOUNTS;
 

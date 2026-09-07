@@ -79,6 +79,8 @@ export function isAllowedReturnTo(client: SsoClient, returnTo: string): boolean 
   const host = parsed.hostname.toLowerCase();
   if (host === "localhost" || host === "127.0.0.1") return true;
   if (host === "core-tap.local") return true;
+  // Marketing/product apex — not venue tenants like joes.core-tap.com.
+  if (host === "core-tap.com" || host === "www.core-tap.com") return true;
   if (host === "deltakinetics.io" || host.endsWith(".deltakinetics.io")) return true;
   return false;
 }

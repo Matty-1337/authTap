@@ -7,7 +7,7 @@ export type AuthUser = { id: number; name: string; email: string };
 export type DkAuthResult =
   | { ok: true; token: string; user: AuthUser }
   | { ok: true; needsVerification: true; email: string }
-  | { ok: false; status: number; error: string };
+  | { ok: false; status: number; error: string; alreadyVerified?: boolean };
 
 export type DkClientContext = {
   turnstileToken?: string;
@@ -34,6 +34,12 @@ export function parseError(data: Record<string, unknown>, fallback: string): str
   }
   if (data.reason === "email_unverified") {
     return "Verify your email to finish creating this account.";
+  }
+  if (data.reason === "already_verified") {
+    return "This email is already verified. Sign in to continue.";
+  }
+  if (data.reason === "code_sent") {
+    return "We sent a new code to your email.";
   }
   if (typeof data.message === "string" && data.message) return data.message;
   if (typeof data.error === "string" && data.error) return data.error;
@@ -73,6 +79,24 @@ export function isVerifiedAuth(result: DkAuthResult): result is { ok: true; toke
   return result.ok === true && !("needsVerification" in result && result.needsVerification);
 }
 
+export async function dkAccountVerified(token: string): Promise<boolean> {
+  const base = dkBackendUrl();
+  try {
+    const res = await fetch(`${base}/api/user`, {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      cache: "no-store",
+    });
+    if (!res.ok) return false;
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    return typeof data.email_verified_at === "string" && data.email_verified_at.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 export async function dkVerifyEmail(
   email: string,
   code: string,
@@ -93,7 +117,12 @@ export async function dkVerifyEmail(
 
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
-    return { ok: false, status: res.status, error: parseError(data, "Invalid or expired verification code.") };
+    return {
+      ok: false,
+      status: res.status,
+      error: parseError(data, "Invalid or expired verification code."),
+      alreadyVerified: data.reason === "already_verified",
+    };
   }
 
   const token = (data.token ?? data.access_token) as string | undefined;
@@ -102,7 +131,10 @@ export async function dkVerifyEmail(
   return { ok: true, token, user: toUser(rawUser, email) };
 }
 
-export async function dkResendVerification(email: string, client?: DkClientContext): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function dkResendVerification(
+  email: string,
+  client?: DkClientContext,
+): Promise<{ ok: true } | { ok: false; error: string; alreadyVerified?: boolean }> {
   const base = dkBackendUrl();
   let res: Response;
   try {
@@ -117,7 +149,11 @@ export async function dkResendVerification(email: string, client?: DkClientConte
   }
   if (!res.ok) {
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-    return { ok: false, error: parseError(data, "Could not resend the code.") };
+    return {
+      ok: false,
+      error: parseError(data, "Could not resend the code."),
+      alreadyVerified: data.reason === "already_verified",
+    };
   }
   return { ok: true };
 }
