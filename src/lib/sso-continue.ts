@@ -3,12 +3,12 @@ import "server-only";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
-import { nexustapReturnOrigins, sessionSecret, signaltapReturnOrigins } from "@/lib/env";
+import { coretapReturnOrigins, nexustapReturnOrigins, sessionSecret, signaltapReturnOrigins } from "@/lib/env";
 
 export const CONTINUE_COOKIE = "at_continue";
 export const CONTINUE_TTL_SECONDS = 60 * 10;
 
-export const SSO_CLIENTS = ["nexustap", "signaltap"] as const;
+export const SSO_CLIENTS = ["coretap", "nexustap", "signaltap"] as const;
 export type SsoClient = (typeof SSO_CLIENTS)[number];
 
 export type ContinueRequest = {
@@ -36,6 +36,8 @@ function isSsoClient(value: string): value is SsoClient {
 
 function allowedOriginsFor(client: SsoClient): string[] {
   switch (client) {
+    case "coretap":
+      return coretapReturnOrigins();
     case "nexustap":
       return nexustapReturnOrigins();
     case "signaltap":
@@ -47,6 +49,7 @@ function allowedOriginsFor(client: SsoClient): string[] {
 
 function callbackPathFor(client: SsoClient): string {
   switch (client) {
+    case "coretap":
     case "nexustap":
     case "signaltap":
       return "/auth/authtap/callback";
@@ -75,6 +78,7 @@ export function isAllowedReturnTo(client: SsoClient, returnTo: string): boolean 
 
   const host = parsed.hostname.toLowerCase();
   if (host === "localhost" || host === "127.0.0.1") return true;
+  if (host === "core-tap.local") return true;
   if (host === "deltakinetics.io" || host.endsWith(".deltakinetics.io")) return true;
   return false;
 }
@@ -144,6 +148,29 @@ export async function clearContinueRequest(): Promise<void> {
 
 export async function afterAuthPath(): Promise<string> {
   return (await readContinueRequest()) ? "/api/sso/complete" : "/account";
+}
+
+/** Keep client/return_to/state on AuthTAP /login after the email step. */
+export function applyContinueParams(url: URL, request: ContinueRequest | null): URL {
+  if (!request) return url;
+  url.searchParams.set("client", request.client);
+  url.searchParams.set("return_to", request.returnTo);
+  url.searchParams.set("state", request.state);
+  return url;
+}
+
+export function continueFromUnknown(input: {
+  client?: unknown;
+  return_to?: unknown;
+  returnTo?: unknown;
+  state?: unknown;
+}): ContinueRequest | null {
+  return parseContinueInput({
+    client: typeof input.client === "string" ? input.client : "",
+    return_to: typeof input.return_to === "string" ? input.return_to : "",
+    returnTo: typeof input.returnTo === "string" ? input.returnTo : "",
+    state: typeof input.state === "string" ? input.state : "",
+  });
 }
 
 export function productLoginUrl(request: ContinueRequest, error?: string): string {

@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
-import { cancelContinue, continueWithAccount, useAnotherAccount } from "@/app/continue/actions";
+import { useState } from "react";
+import { cancelContinue, useAnotherAccount } from "@/app/continue/actions";
 import { AccountAvatar } from "@/components/AccountAvatar";
 import { BrandBusy } from "@/components/BrandBusy";
 
@@ -14,23 +14,25 @@ type ContinuePickerProps = {
   error?: string;
 };
 
-const initial: { error: string } = { error: "" };
-
 export function ContinuePicker({ accounts, error = "" }: ContinuePickerProps) {
-  const [state, action, pending] = useActionState(continueWithAccount, initial);
-  const shownError = state.error || error;
+  const [pending, setPending] = useState(false);
 
   return (
     <div className="flex w-full flex-col gap-2">
       {pending ? <BrandBusy label="Signing in" /> : null}
-      {shownError ? (
+      {error ? (
         <p role="alert" className="mb-2 text-center text-[13px] text-[#F2A0A0]">
-          {shownError}
+          {error}
         </p>
       ) : null}
 
       {accounts.map((account) => (
-        <form key={account.user.id} action={action}>
+        <form
+          key={account.user.id}
+          action="/api/sso/complete"
+          method="post"
+          onSubmit={() => setPending(true)}
+        >
           <input type="hidden" name="userId" value={account.user.id} />
           <button
             type="submit"

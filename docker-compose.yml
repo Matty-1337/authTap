@@ -3,8 +3,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-}
+        NEXT_PUBLIC_TURNSTILE_ENFORCE: ${NEXT_PUBLIC_TURNSTILE_ENFORCE:-1}
     ports:
       - "127.0.0.1:${AUTHTAP_PORT:-3004}:3000"
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
+      - AUTHTAP_PUBLIC_URL=${AUTHTAP_PUBLIC_URL:-https://authtap.deltakinetics.io}
     restart: unless-stopped

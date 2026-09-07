@@ -7,15 +7,20 @@ import {
 } from "@/lib/auth-flow";
 import { completePasswordSignIn, redirectLocation } from "@/lib/auth-sign-in";
 import type { AuthMode } from "@/lib/auth-types";
+import { clientContextFrom } from "@/lib/dk-auth";
+import { turnstileTokenFromForm } from "@/lib/turnstile";
 import {
   SESSION_COOKIE,
   attachSessionStore,
   verifyAccountStore,
 } from "@/lib/session";
+import { publicOrigin, publicUrl } from "@/lib/public-origin";
 import {
   CONTINUE_COOKIE,
   clearContinueCookie,
+  applyContinueParams,
   parseContinueCookie,
+  continueFromUnknown,
 } from "@/lib/sso-continue";
 
 export const runtime = "nodejs";
@@ -33,7 +38,12 @@ export async function POST(req: NextRequest) {
    * Set-Cookie. Incoming already-signed-in SSO works because it 303s from
    * this same Request/NextResponse pair. First-time sign-in must match that.
    */
-  const continueRequest = await parseContinueCookie(req.cookies.get(CONTINUE_COOKIE)?.value);
+  const continueRequest =
+    continueFromUnknown({
+      client: form.get("client"),
+      return_to: form.get("return_to"),
+      state: form.get("state"),
+    }) ?? (await parseContinueCookie(req.cookies.get(CONTINUE_COOKIE)?.value));
   const pendingEmail = parsePendingEmail(req.cookies.get(PENDING_EMAIL_COOKIE)?.value, mode);
   const existingStore = await verifyAccountStore(req.cookies.get(SESSION_COOKIE)?.value);
 
@@ -43,13 +53,15 @@ export async function POST(req: NextRequest) {
     pendingEmail,
     continueRequest,
     existingStore,
+    client: clientContextFrom(req, turnstileTokenFromForm(form)),
   });
 
   if (!result.ok) {
-    return NextResponse.redirect(new URL(pathFor(mode, result.error), req.url), 303);
+    const dest = applyContinueParams(publicUrl(pathFor(mode, result.error), req), continueRequest);
+    return NextResponse.redirect(dest, 303);
   }
 
-  const res = NextResponse.redirect(redirectLocation(result.dest.url, req.url), 303);
+  const res = NextResponse.redirect(redirectLocation(result.dest.url, publicOrigin(req)), 303);
   await attachSessionStore(res, result.store);
   clearPendingEmailCookie(res);
   if (result.dest.clearContinue) clearContinueCookie(res);

@@ -3,15 +3,23 @@ import { AuthForm } from "@/components/AuthForm";
 import { AuthTapMark } from "@/components/AuthTapMark";
 import { AuthWordmark } from "@/components/AuthWordmark";
 import type { AuthMode } from "@/lib/auth-types";
+import type { ContinueRequest } from "@/lib/sso-continue";
 
 type AuthPanelProps = {
   mode: AuthMode;
   email: string;
   error: string;
   adding?: boolean;
+  continueRequest?: ContinueRequest | null;
 };
 
-export function AuthPanel({ mode, email, error, adding = false }: AuthPanelProps) {
+export function AuthPanel({
+  mode,
+  email,
+  error,
+  adding = false,
+  continueRequest = null,
+}: AuthPanelProps) {
   const copy = copyFor(mode);
 
   return (
@@ -23,7 +31,7 @@ export function AuthPanel({ mode, email, error, adding = false }: AuthPanelProps
         </div>
 
         <div className="mt-8 flex w-full flex-col gap-3 md:mt-0">
-          <AuthForm mode={mode} email={email} error={error} />
+          <AuthForm mode={mode} email={email} error={error} continueRequest={continueRequest} />
 
           <p className="text-center text-[14px] text-[#F2F2F5]/55 md:text-left">
             {copy.switchLabel}{" "}

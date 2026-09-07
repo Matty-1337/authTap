@@ -8,10 +8,47 @@ export type DkAuthResult =
   | { ok: true; token: string; user: AuthUser }
   | { ok: false; status: number; error: string };
 
-function parseError(data: Record<string, unknown>, fallback: string): string {
+export type DkClientContext = {
+  turnstileToken?: string;
+  userAgent?: string;
+  forwardedFor?: string;
+};
+
+export function clientContextFrom(req: Request, turnstileToken = ""): DkClientContext {
+  const forwardedFor =
+    req.headers.get("cf-connecting-ip") ||
+    req.headers.get("x-real-ip") ||
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "";
+  return {
+    turnstileToken: turnstileToken.trim(),
+    userAgent: req.headers.get("user-agent") ?? "",
+    forwardedFor,
+  };
+}
+
+export function parseError(data: Record<string, unknown>, fallback: string): string {
+  if (data.reason === "turnstile_required") {
+    return "Confirm you are not a robot, then try again.";
+  }
   if (typeof data.message === "string" && data.message) return data.message;
   if (typeof data.error === "string" && data.error) return data.error;
   return fallback;
+}
+
+function authHeaders(client?: DkClientContext): HeadersInit {
+  return {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    "X-Product": "coretap",
+    ...(client?.forwardedFor ? { "X-Forwarded-For": client.forwardedFor } : {}),
+    ...(client?.userAgent ? { "User-Agent": client.userAgent } : {}),
+  };
+}
+
+function authBody(fields: Record<string, string>, client?: DkClientContext): string {
+  const token = client?.turnstileToken?.trim();
+  return JSON.stringify(token ? { ...fields, turnstileToken: token } : fields);
 }
 
 function toUser(raw: Record<string, unknown>, email: string): AuthUser {
@@ -31,18 +68,18 @@ function nameFromEmail(email: string): string {
   return named.slice(0, 255) || "Account";
 }
 
-export async function dkLogin(email: string, password: string): Promise<DkAuthResult> {
+export async function dkLogin(
+  email: string,
+  password: string,
+  client?: DkClientContext,
+): Promise<DkAuthResult> {
   const base = dkBackendUrl();
   let res: Response;
   try {
     res = await fetch(`${base}/api/login`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "X-Product": "coretap",
-      },
-      body: JSON.stringify({ email, password, product: "coretap" }),
+      headers: authHeaders(client),
+      body: authBody({ email, password, product: "coretap" }, client),
       cache: "no-store",
     });
   } catch {
@@ -60,22 +97,29 @@ export async function dkLogin(email: string, password: string): Promise<DkAuthRe
   return { ok: true, token, user: toUser(rawUser, email) };
 }
 
-export async function dkRegister(email: string, password: string): Promise<DkAuthResult> {
+export async function dkRegister(
+  email: string,
+  password: string,
+  client?: DkClientContext,
+): Promise<DkAuthResult> {
   const base = dkBackendUrl();
   let res: Response;
   try {
     res = await fetch(`${base}/api/register`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({
-        name: nameFromEmail(email),
-        email,
-        password,
-        password_confirmation: password,
-        product: dkLoginProduct(),
-        country_code: "1",
-        phone: "0000000000",
-      }),
+      headers: authHeaders(client),
+      body: authBody(
+        {
+          name: nameFromEmail(email),
+          email,
+          password,
+          password_confirmation: password,
+          product: dkLoginProduct(),
+          country_code: "1",
+          phone: "0000000000",
+        },
+        client,
+      ),
       cache: "no-store",
     });
   } catch {
