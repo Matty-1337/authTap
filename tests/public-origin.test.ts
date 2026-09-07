@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { publicOrigin, publicUrl } from "@/lib/public-origin";
 
+const env = process.env as Record<string, string | undefined>;
+
 const previous = {
   publicUrl: process.env.AUTHTAP_PUBLIC_URL,
   nodeEnv: process.env.NODE_ENV,
@@ -8,7 +10,7 @@ const previous = {
 
 afterEach(() => {
   process.env.AUTHTAP_PUBLIC_URL = previous.publicUrl;
-  process.env.NODE_ENV = previous.nodeEnv;
+  env.NODE_ENV = previous.nodeEnv;
 });
 
 function request(url: string, headers: Record<string, string> = {}): Request {
@@ -41,7 +43,7 @@ describe("publicOrigin", () => {
 
   it("keeps localhost for local tests and dev", () => {
     delete process.env.AUTHTAP_PUBLIC_URL;
-    process.env.NODE_ENV = "test";
+    env.NODE_ENV = "test";
     expect(publicOrigin(request("http://localhost:3004/api/auth/email"))).toBe(
       "http://localhost:3004",
     );
@@ -52,7 +54,7 @@ describe("publicOrigin", () => {
 
   it("falls back to the production domain when only 0.0.0.0 is available", () => {
     delete process.env.AUTHTAP_PUBLIC_URL;
-    process.env.NODE_ENV = "production";
+    env.NODE_ENV = "production";
     expect(publicOrigin(request("https://0.0.0.0:3000/account", { host: "0.0.0.0:3000" }))).toBe(
       "https://authtap.deltakinetics.io",
     );

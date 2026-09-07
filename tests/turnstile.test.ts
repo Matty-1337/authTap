@@ -5,13 +5,11 @@ import { isTurnstileEnabled, turnstileTokenFromForm } from "@/lib/turnstile";
 const previous = {
   siteKey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
   enforce: process.env.NEXT_PUBLIC_TURNSTILE_ENFORCE,
-  nodeEnv: process.env.NODE_ENV,
 };
 
 afterEach(() => {
   process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = previous.siteKey;
   process.env.NEXT_PUBLIC_TURNSTILE_ENFORCE = previous.enforce;
-  process.env.NODE_ENV = previous.nodeEnv;
 });
 
 describe("turnstileTokenFromForm", () => {
