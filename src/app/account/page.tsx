@@ -4,16 +4,13 @@ import { AccountAvatar } from "@/components/AccountAvatar";
 import { AuthTapMark } from "@/components/AuthTapMark";
 import { AuthWordmark } from "@/components/AuthWordmark";
 import { MAX_ACCOUNTS, readAccountStore } from "@/lib/session";
-import { readContinueRequest } from "@/lib/sso-continue";
 
 export default async function AccountPage() {
   const store = await readAccountStore();
   if (!store) redirect("/login");
 
-  const pending = await readContinueRequest();
-  if (pending) {
-    redirect(store.accounts.length === 1 ? "/api/sso/complete" : "/continue");
-  }
+  // Middleware + /api/sso/complete finish an in-flight CoreTAP continue.
+  // Do not read at_continue via cookies() here — that API can miss it.
 
   const active = store.accounts.find((account) => account.user.id === store.activeUserId) ?? store.accounts[0];
   const others = store.accounts.filter((account) => account.user.id !== active.user.id);

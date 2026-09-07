@@ -147,7 +147,10 @@ export async function clearContinueRequest(): Promise<void> {
 }
 
 export async function afterAuthPath(): Promise<string> {
-  return (await readContinueRequest()) ? "/api/sso/complete" : "/account";
+  // Always hop through the Route Handler. cookies() on /login and /account
+  // can miss at_continue after at_session is written, which left SSO users
+  // on /account instead of CoreTAP.
+  return "/api/sso/complete";
 }
 
 /** Keep client/return_to/state on AuthTAP /login after the email step. */
