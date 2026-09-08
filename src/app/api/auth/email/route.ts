@@ -4,11 +4,9 @@ import { isValidEmail, normalizeEmail } from "@/lib/auth-sign-in";
 import type { AuthMode } from "@/lib/auth-types";
 import { publicUrl } from "@/lib/public-origin";
 import {
-  CONTINUE_COOKIE,
   applyContinueParams,
   attachContinueCookie,
   continueFromUnknown,
-  parseContinueCookie,
 } from "@/lib/sso-continue";
 
 export const runtime = "nodejs";
@@ -23,12 +21,11 @@ export async function POST(req: NextRequest) {
   const mode = modeFrom(form);
   const typedEmail = String(form.get("email") ?? "");
   const email = normalizeEmail(typedEmail);
-  const continueRequest =
-    continueFromUnknown({
-      client: form.get("client"),
-      return_to: form.get("return_to"),
-      state: form.get("state"),
-    }) ?? (await parseContinueCookie(req.cookies.get(CONTINUE_COOKIE)?.value));
+  const continueRequest = continueFromUnknown({
+    client: form.get("client"),
+    return_to: form.get("return_to"),
+    state: form.get("state"),
+  });
 
   if (!isValidEmail(email)) {
     const dest = applyContinueParams(publicUrl(pathFor(mode, "Enter a valid email."), req), continueRequest);

@@ -5,17 +5,26 @@ export const ADDING_COOKIE = "at_adding";
 const CONTINUE_PATHS = new Set(["/", "/login", "/register", "/account"]);
 
 /**
- * Request cookies, not cookies(). Next Route Handlers / Server Components
- * can miss at_continue after writing at_session, which left CoreTAP SSO
- * users stuck on /account.
+ * Finish a product hop only when this request still carries the hop
+ * (client/return_to/state). A leftover at_continue cookie must not yank a
+ * direct AuthTAP visit — AuthTAP is the account warehouse.
  */
+export function hasSsoQuery(search: URLSearchParams): boolean {
+  const client = (search.get("client") ?? "").trim();
+  const returnTo = (search.get("return_to") ?? "").trim();
+  const state = (search.get("state") ?? "").trim();
+  return Boolean(client && returnTo && state);
+}
+
 export function ssoCompletePath(input: {
   pathname: string;
   hasSession: boolean;
   hasContinue: boolean;
   adding: boolean;
+  hasSsoQuery: boolean;
 }): string | null {
-  if (input.adding || !input.hasSession || !input.hasContinue) return null;
+  if (input.adding || !input.hasSession) return null;
+  if (!input.hasSsoQuery) return null;
   if (!CONTINUE_PATHS.has(input.pathname)) return null;
   return "/api/sso/complete";
 }

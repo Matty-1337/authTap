@@ -3,7 +3,7 @@ import { VerifyEmailForm } from "@/components/VerifyEmailForm";
 import { AuthWordmark } from "@/components/AuthWordmark";
 import { readPendingVerifyEmail } from "@/lib/auth-flow";
 import { isAddingAccount, readSession } from "@/lib/session";
-import { afterAuthPath, parseContinueInput, readContinueRequest } from "@/lib/sso-continue";
+import { afterAuthPath, parseContinueInput } from "@/lib/sso-continue";
 
 type VerifyEmailPageProps = {
   searchParams: Promise<{ error?: string; email?: string; client?: string; return_to?: string; state?: string }>;
@@ -27,7 +27,7 @@ export default async function VerifyEmailPage({ searchParams }: VerifyEmailPageP
     redirect("/register");
   }
 
-  const continueRequest = pending ?? (await readContinueRequest());
+  const continueRequest = pending;
   return (
     <main className="flex flex-1 items-center justify-center px-4 py-12">
       <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#1C1F32] px-6 py-8 text-center sm:px-8">
