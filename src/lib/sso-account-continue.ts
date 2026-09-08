@@ -16,6 +16,12 @@ export function hasSsoQuery(search: URLSearchParams): boolean {
   return Boolean(client && returnTo && state);
 }
 
+/** Wipe a leftover hop only on the warehouse — never on login/register/verify. */
+export function shouldClearLeftoverContinue(pathname: string, hasSsoQuery: boolean): boolean {
+  if (hasSsoQuery) return false;
+  return pathname === "/" || pathname === "/account";
+}
+
 export function ssoCompletePath(input: {
   pathname: string;
   hasSession: boolean;

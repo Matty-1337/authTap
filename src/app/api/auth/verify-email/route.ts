@@ -13,9 +13,8 @@ import {
   CONTINUE_COOKIE,
   applyContinueParams,
   attachContinueCookie,
-  continueFromUnknown,
   destinationWhenAlreadyVerified,
-  parseContinueCookie,
+  resolveContinue,
 } from "@/lib/sso-continue";
 
 export const runtime = "nodejs";
@@ -27,12 +26,14 @@ function wantsJson(req: NextRequest): boolean {
 
 export async function POST(req: NextRequest) {
   const form = await req.formData();
-  const continueRequest =
-    continueFromUnknown({
+  const continueRequest = await resolveContinue(
+    {
       client: form.get("client"),
       return_to: form.get("return_to"),
       state: form.get("state"),
-    }) ?? (await parseContinueCookie(req.cookies.get(CONTINUE_COOKIE)?.value));
+    },
+    req.cookies.get(CONTINUE_COOKIE)?.value,
+  );
   const email =
     String(form.get("email") ?? "").trim().toLowerCase() ||
     parsePendingVerifyEmail(req.cookies.get("at_pending_verify")?.value);

@@ -94,16 +94,33 @@ describe("POST /api/auth/verify-email", () => {
     expect(url.searchParams.get("client")).toBe("coretap");
   });
 
-  it("hands a successful verify through to the product", async () => {
+  it("sends a product-hop verify to Continue, not the warehouse", async () => {
     vi.mocked(dkVerifyEmail).mockResolvedValue({ ok: true, token: "core-token", user });
-    vi.mocked(handoffToProduct).mockResolvedValue({ ok: true, token: "product-token", user });
-    vi.mocked(signHandoffCode).mockResolvedValue("handoff-code");
 
     const res = await postVerify(verifyReq(continueFields));
     const data = (await res.json()) as { ok?: boolean; url?: string };
     expect(data.ok).toBe(true);
-    const url = new URL(data.url ?? "");
-    expect(url.origin + url.pathname).toBe("http://localhost:3000/auth/authtap/callback");
-    expect(url.searchParams.get("code")).toBe("handoff-code");
+    expect(new URL(data.url ?? "").pathname).toBe("/continue");
+    expect(res.cookies.get("at_session")?.value).toBeTruthy();
+    expect(res.cookies.get("at_continue")?.value).toBeTruthy();
+    expect(handoffToProduct).not.toHaveBeenCalled();
+  });
+
+  it("keeps the product hop from at_continue when the verify form omits it", async () => {
+    vi.mocked(dkVerifyEmail).mockResolvedValue({ ok: true, token: "core-token", user });
+    const continueToken = await new SignJWT({
+      client: "coretap",
+      returnTo: "http://localhost:3000/auth/authtap/callback",
+      state: "state-token-1",
+    })
+      .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+      .setIssuedAt()
+      .setExpirationTime("10m")
+      .sign(new TextEncoder().encode(sessionSecret()));
+
+    const res = await postVerify(verifyReq({ email: "fancy@example.com", code: "123456" }, `at_continue=${continueToken}`));
+    const data = (await res.json()) as { url?: string };
+    expect(new URL(data.url ?? "").pathname).toBe("/continue");
+    expect(res.cookies.get("at_continue")?.value).toBeTruthy();
   });
 });

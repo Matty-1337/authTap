@@ -2,8 +2,11 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { attachSessionStore, mergeAccountIntoStore, type SessionData } from "@/lib/session";
-import { destinationAfterSignIn } from "@/lib/sso-complete";
-import { clearContinueCookie, type ContinueRequest } from "@/lib/sso-continue";
+import {
+  attachContinueCookie,
+  destinationAfterVerify,
+  type ContinueRequest,
+} from "@/lib/sso-continue";
 import { redirectLocation } from "@/lib/auth-sign-in";
 
 export async function completeVerifiedSession(input: {
@@ -19,13 +22,13 @@ export async function completeVerifiedSession(input: {
   const merged = mergeAccountIntoStore(account, null);
   if (!merged.ok) return { ok: false, error: merged.error };
 
-  const dest = await destinationAfterSignIn(account, input.continueRequest);
+  const dest = destinationAfterVerify(input.continueRequest);
   return {
     ok: true,
-    url: redirectLocation(dest.url, input.origin),
+    url: redirectLocation(dest, input.origin),
     apply: async (res) => {
       await attachSessionStore(res, merged.store);
-      if (dest.clearContinue) clearContinueCookie(res);
+      if (input.continueRequest) await attachContinueCookie(res, input.continueRequest);
     },
   };
 }
