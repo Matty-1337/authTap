@@ -3,7 +3,7 @@ import { AuthPanel } from "@/components/AuthPanel";
 import { BrandSplash } from "@/components/BrandSplash";
 import { readPendingEmail } from "@/lib/auth-flow";
 import { isAddingAccount, readSession } from "@/lib/session";
-import { afterAuthPath, parseContinueInput, readContinueRequest } from "@/lib/sso-continue";
+import { afterAuthPath, parseContinueInput } from "@/lib/sso-continue";
 
 type HomePageProps = {
   searchParams: Promise<{ error?: string; client?: string; return_to?: string; state?: string }>;
@@ -24,7 +24,7 @@ export default async function Home({ searchParams }: HomePageProps) {
 
   const error = params.error ?? "";
   const email = await readPendingEmail("login");
-  const continueRequest = parseContinueInput(params) ?? (await readContinueRequest());
+  const continueRequest = parseContinueInput(params);
   return (
     <>
       {adding ? null : <BrandSplash />}

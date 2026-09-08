@@ -166,7 +166,7 @@ describe("completePasswordSignIn", () => {
 });
 
 describe("POST /api/auth/email", () => {
-  it("303s to /login and only writes the pending email cookie", async () => {
+  it("303s to /login and does not revive a leftover product continue cookie", async () => {
     const continueToken = await signContinueCookie();
     const res = await postEmail(
       formRequest(
@@ -179,11 +179,8 @@ describe("POST /api/auth/email", () => {
     expect(res.status).toBe(303);
     const location = new URL(res.headers.get("location") ?? "");
     expect(location.origin + location.pathname).toBe("http://localhost:3004/login");
-    expect(location.searchParams.get("client")).toBe("signaltap");
-    expect(location.searchParams.get("return_to")).toBe("http://localhost:3001/auth/authtap/callback");
-    expect(location.searchParams.get("state")).toBe("state-token-1");
+    expect(location.searchParams.get("client")).toBeNull();
     expect(res.cookies.get("at_pending_email")?.value).toBe("login:fancy@example.com");
-    expect(res.cookies.get(CONTINUE_COOKIE)?.value).toBeTruthy();
   });
 
   it("keeps CoreTAP continue fields from the email form on /login", async () => {
@@ -215,11 +212,9 @@ describe("POST /api/auth/sign-in", () => {
     vi.mocked(signHandoffCode).mockReset();
   });
 
-  it("303s to Signal TAP with code and state from the incoming at_continue cookie", async () => {
+  it("stays on AuthTAP when only a leftover at_continue cookie is present", async () => {
     const continueToken = await signContinueCookie();
     vi.mocked(dkLogin).mockResolvedValue({ ok: true, token: "core-token", user });
-    vi.mocked(handoffToProduct).mockResolvedValue({ ok: true, token: "product-token", user });
-    vi.mocked(signHandoffCode).mockResolvedValue("handoff-code");
 
     const res = await postSignIn(
       formRequest(
@@ -236,15 +231,8 @@ describe("POST /api/auth/sign-in", () => {
     );
     expect(res.status).toBe(303);
     const location = new URL(res.headers.get("location") ?? "");
-    expect(location.origin + location.pathname).toBe("http://localhost:3001/auth/authtap/callback");
-    expect(location.searchParams.get("code")).toBe("handoff-code");
-    expect(location.searchParams.get("state")).toBe("state-token-1");
-    expect(signHandoffCode).toHaveBeenCalledWith({
-      request: continueRequest,
-      token: "product-token",
-      user,
-    });
-
+    expect(location.origin + location.pathname).toBe("http://localhost:3004/account");
+    expect(handoffToProduct).not.toHaveBeenCalled();
     expect(res.cookies.get("at_session")?.value).toBeTruthy();
     expect(res.cookies.get("at_pending_email")?.value).toBe("");
   });
