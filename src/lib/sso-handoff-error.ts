@@ -17,6 +17,6 @@ export function handoffErrorFromResponse(status: number, data: Record<string, un
   return { error: message, stale: false }
 }
 
-export function isStaleHandoff(result: { ok: false; stale?: boolean }): boolean {
+export function isStaleHandoff(result: { ok: false; error: string; stale?: boolean }): boolean {
   return result.stale === true
 }
