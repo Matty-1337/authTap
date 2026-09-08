@@ -20,6 +20,7 @@ export function VerifyEmailForm({ email, error, continueRequest = null }: Verify
   const [leaving, setLeaving] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const submittedCodeRef = useRef<string | null>(null);
+  const navigatedRef = useRef(false);
   const displayError = clientError ?? error;
 
   useEffect(() => {
@@ -70,7 +71,15 @@ export function VerifyEmailForm({ email, error, continueRequest = null }: Verify
         error?: string;
         alreadyVerified?: boolean;
       };
-      if (data.url && (data.ok || data.alreadyVerified)) {
+      if (data.ok && data.url) {
+        navigatedRef.current = true;
+        window.location.assign(data.url);
+        return;
+      }
+      // A duplicate submit after the first verify succeeds must not replace
+      // the product hop with /login?error=already verified.
+      if (data.alreadyVerified && data.url && !navigatedRef.current) {
+        navigatedRef.current = true;
         window.location.assign(data.url);
         return;
       }
@@ -194,7 +203,8 @@ export function VerifyEmailForm({ email, error, continueRequest = null }: Verify
                 url?: string;
                 alreadyVerified?: boolean;
               };
-              if (data.alreadyVerified && data.url) {
+              if (data.alreadyVerified && data.url && !navigatedRef.current) {
+                navigatedRef.current = true;
                 window.location.assign(data.url);
                 return;
               }

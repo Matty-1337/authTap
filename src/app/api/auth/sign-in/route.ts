@@ -18,10 +18,11 @@ import {
 } from "@/lib/session";
 import { publicOrigin, publicUrl } from "@/lib/public-origin";
 import {
+  CONTINUE_COOKIE,
   attachContinueCookie,
   clearContinueCookie,
   applyContinueParams,
-  continueFromUnknown,
+  resolveContinue,
 } from "@/lib/sso-continue";
 
 export const runtime = "nodejs";
@@ -46,11 +47,14 @@ export async function POST(req: NextRequest) {
    * Set-Cookie. Incoming already-signed-in SSO works because it 303s from
    * this same Request/NextResponse pair. First-time sign-in must match that.
    */
-  const continueRequest = continueFromUnknown({
-    client: form.get("client"),
-    return_to: form.get("return_to"),
-    state: form.get("state"),
-  });
+  const continueRequest = await resolveContinue(
+    {
+      client: form.get("client"),
+      return_to: form.get("return_to"),
+      state: form.get("state"),
+    },
+    req.cookies.get(CONTINUE_COOKIE)?.value,
+  );
   const pendingEmail = parsePendingEmail(req.cookies.get(PENDING_EMAIL_COOKIE)?.value, mode);
   const existingStore = await verifyAccountStore(req.cookies.get(SESSION_COOKIE)?.value);
 

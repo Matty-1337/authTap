@@ -6,7 +6,7 @@ import type { NextResponse } from "next/server";
 import { coretapReturnOrigins, nexustapReturnOrigins, sessionSecret, signaltapReturnOrigins } from "@/lib/env";
 
 export const CONTINUE_COOKIE = "at_continue";
-export const CONTINUE_TTL_SECONDS = 60 * 10;
+export const CONTINUE_TTL_SECONDS = 60 * 30;
 
 export const SSO_CLIENTS = ["coretap", "nexustap", "signaltap"] as const;
 export type SsoClient = (typeof SSO_CLIENTS)[number];
@@ -180,6 +180,25 @@ export function pathAfterIncomingStore(hasStore: boolean, request: ContinueReque
   return hasStore ? "/continue" : loginContinuePath(request);
 }
 
+/**
+ * A second verify/resend after the email is already active must finish the
+ * product hop — not dump the user on /login with a dead-end error.
+ */
+export function destinationWhenAlreadyVerified(
+  request: ContinueRequest | null,
+  hasSession: boolean,
+): string {
+  if (request) {
+    return hasSession ? ssoIncomingPath(request) : loginContinuePath(request);
+  }
+  // No product hop: the email is verified, but AuthTAP has no proof of identity
+  // here (the code was consumed and there is no password). Routing to /account
+  // would show a session that does not include this freshly verified account.
+  // Send the user to sign-in (email prefilled from the pending cookie) so
+  // logging in adds the account to the store.
+  return "/login";
+}
+
 export function continueFromUnknown(input: {
   client?: unknown;
   return_to?: unknown;
@@ -192,6 +211,32 @@ export function continueFromUnknown(input: {
     returnTo: typeof input.returnTo === "string" ? input.returnTo : "",
     state: typeof input.state === "string" ? input.state : "",
   });
+}
+
+/** Form/query first, then at_continue — signup must not drop the product hop. */
+export async function resolveContinue(
+  input: {
+    client?: unknown;
+    return_to?: unknown;
+    returnTo?: unknown;
+    state?: unknown;
+  },
+  cookieRaw?: string | null,
+): Promise<ContinueRequest | null> {
+  return continueFromUnknown(input) ?? (await parseContinueCookie(cookieRaw));
+}
+
+export async function continueFromSearchOrJar(params: {
+  client?: string;
+  return_to?: string;
+  state?: string;
+}): Promise<ContinueRequest | null> {
+  return parseContinueInput(params) ?? (await readContinueRequest());
+}
+
+/** After email verify, a product hop stays on the picker — not the warehouse. */
+export function destinationAfterVerify(request: ContinueRequest | null): string {
+  return request ? "/continue" : "/account";
 }
 
 export function productLoginUrl(request: ContinueRequest, error?: string): string {

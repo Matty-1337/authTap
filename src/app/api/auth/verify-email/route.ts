@@ -1,20 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  attachPendingEmailCookie,
   attachPendingVerifyCookie,
   clearPendingVerifyCookie,
   parsePendingVerifyEmail,
-  pathFor,
   verifyEmailPath,
 } from "@/lib/auth-flow";
 import { clientContextFrom, dkVerifyEmail, isVerifiedAuth } from "@/lib/dk-auth";
 import { publicOrigin, publicUrl } from "@/lib/public-origin";
 import { completeVerifiedSession } from "@/lib/auth-verify";
+import { SESSION_COOKIE, verifyAccountStore } from "@/lib/session";
 import {
   CONTINUE_COOKIE,
   applyContinueParams,
   attachContinueCookie,
-  continueFromUnknown,
-  parseContinueCookie,
+  destinationWhenAlreadyVerified,
+  resolveContinue,
 } from "@/lib/sso-continue";
 
 export const runtime = "nodejs";
@@ -26,12 +27,14 @@ function wantsJson(req: NextRequest): boolean {
 
 export async function POST(req: NextRequest) {
   const form = await req.formData();
-  const continueRequest =
-    continueFromUnknown({
+  const continueRequest = await resolveContinue(
+    {
       client: form.get("client"),
       return_to: form.get("return_to"),
       state: form.get("state"),
-    }) ?? (await parseContinueCookie(req.cookies.get(CONTINUE_COOKIE)?.value));
+    },
+    req.cookies.get(CONTINUE_COOKIE)?.value,
+  );
   const email =
     String(form.get("email") ?? "").trim().toLowerCase() ||
     parsePendingVerifyEmail(req.cookies.get("at_pending_verify")?.value);
@@ -54,11 +57,17 @@ export async function POST(req: NextRequest) {
   const result = await dkVerifyEmail(email, code, clientContextFrom(req));
   if (!isVerifiedAuth(result)) {
     if (result.ok === false && result.alreadyVerified) {
-      const dest = applyContinueParams(publicUrl(pathFor("login", result.error), req), continueRequest);
-      if (json) {
-        return NextResponse.json({ ok: false, alreadyVerified: true, error: result.error, url: dest.toString() });
-      }
-      return NextResponse.redirect(dest, 303);
+      const store = await verifyAccountStore(req.cookies.get(SESSION_COOKIE)?.value);
+      const dest = publicUrl(destinationWhenAlreadyVerified(continueRequest, Boolean(store)), req);
+      const res = json
+        ? NextResponse.json({ ok: true, alreadyVerified: true, url: dest.toString() })
+        : NextResponse.redirect(dest, 303);
+      if (continueRequest) await attachContinueCookie(res, continueRequest);
+      // Prefill the email on the sign-in page so the user can add this verified
+      // account to the store (AuthTAP has no session for it yet without a hop).
+      if (!continueRequest) attachPendingEmailCookie(res, "login", email);
+      clearPendingVerifyCookie(res);
+      return res;
     }
     const dest = applyContinueParams(
       publicUrl(verifyEmailPath(result.ok ? "Enter the 6-digit code." : result.error), req),
@@ -83,6 +92,7 @@ export async function POST(req: NextRequest) {
     user: result.user,
     continueRequest,
     origin: publicOrigin(req),
+    existingStore: await verifyAccountStore(req.cookies.get(SESSION_COOKIE)?.value),
   });
   if (!finished.ok) {
     const dest = applyContinueParams(publicUrl(verifyEmailPath(finished.error), req), continueRequest);

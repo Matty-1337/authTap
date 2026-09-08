@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasSsoQuery, ssoCompletePath } from "@/lib/sso-account-continue";
+import { hasSsoQuery, shouldClearLeftoverContinue, ssoCompletePath } from "@/lib/sso-account-continue";
 import { afterAuthPath } from "@/lib/sso-continue";
 
 describe("ssoCompletePath", () => {
@@ -58,6 +58,16 @@ describe("ssoCompletePath", () => {
         hasSsoQuery: true,
       }),
     ).toBeNull();
+  });
+});
+
+describe("shouldClearLeftoverContinue", () => {
+  it("keeps the hop on login and register so signup can finish", () => {
+    expect(shouldClearLeftoverContinue("/login", false)).toBe(false);
+    expect(shouldClearLeftoverContinue("/register", false)).toBe(false);
+    expect(shouldClearLeftoverContinue("/", false)).toBe(true);
+    expect(shouldClearLeftoverContinue("/account", false)).toBe(true);
+    expect(shouldClearLeftoverContinue("/account", true)).toBe(false);
   });
 });
 

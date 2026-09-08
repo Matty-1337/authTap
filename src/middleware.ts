@@ -4,6 +4,7 @@ import {
   CONTINUE_COOKIE,
   SESSION_COOKIE,
   hasSsoQuery,
+  shouldClearLeftoverContinue,
   ssoCompletePath,
 } from "@/lib/sso-account-continue";
 
@@ -17,7 +18,7 @@ export function middleware(req: NextRequest) {
     hasSsoQuery: ssoQuery,
   });
   const res = dest ? NextResponse.redirect(new URL(dest, req.url)) : NextResponse.next();
-  if (!ssoQuery && req.cookies.get(CONTINUE_COOKIE)?.value) {
+  if (shouldClearLeftoverContinue(req.nextUrl.pathname, ssoQuery) && req.cookies.get(CONTINUE_COOKIE)?.value) {
     res.cookies.set(CONTINUE_COOKIE, "", { path: "/", maxAge: 0 });
   }
   return res;
