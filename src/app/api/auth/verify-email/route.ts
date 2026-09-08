@@ -3,17 +3,18 @@ import {
   attachPendingVerifyCookie,
   clearPendingVerifyCookie,
   parsePendingVerifyEmail,
-  pathFor,
   verifyEmailPath,
 } from "@/lib/auth-flow";
 import { clientContextFrom, dkVerifyEmail, isVerifiedAuth } from "@/lib/dk-auth";
 import { publicOrigin, publicUrl } from "@/lib/public-origin";
 import { completeVerifiedSession } from "@/lib/auth-verify";
+import { SESSION_COOKIE, verifyAccountStore } from "@/lib/session";
 import {
   CONTINUE_COOKIE,
   applyContinueParams,
   attachContinueCookie,
   continueFromUnknown,
+  destinationWhenAlreadyVerified,
   parseContinueCookie,
 } from "@/lib/sso-continue";
 
@@ -54,11 +55,13 @@ export async function POST(req: NextRequest) {
   const result = await dkVerifyEmail(email, code, clientContextFrom(req));
   if (!isVerifiedAuth(result)) {
     if (result.ok === false && result.alreadyVerified) {
-      const dest = applyContinueParams(publicUrl(pathFor("login", result.error), req), continueRequest);
-      if (json) {
-        return NextResponse.json({ ok: false, alreadyVerified: true, error: result.error, url: dest.toString() });
-      }
-      return NextResponse.redirect(dest, 303);
+      const store = await verifyAccountStore(req.cookies.get(SESSION_COOKIE)?.value);
+      const dest = publicUrl(destinationWhenAlreadyVerified(continueRequest, Boolean(store)), req);
+      const res = json
+        ? NextResponse.json({ ok: true, alreadyVerified: true, url: dest.toString() })
+        : NextResponse.redirect(dest, 303);
+      if (continueRequest) await attachContinueCookie(res, continueRequest);
+      return res;
     }
     const dest = applyContinueParams(
       publicUrl(verifyEmailPath(result.ok ? "Enter the 6-digit code." : result.error), req),

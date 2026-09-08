@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   applyContinueParams,
   isAllowedReturnTo,
+  destinationWhenAlreadyVerified,
   loginContinuePath,
   parseContinueInput,
   pathAfterIncomingStore,
@@ -133,5 +134,12 @@ describe("same-site incoming hop", () => {
     expect(pathAfterIncomingStore(true, request)).toBe("/continue");
     expect(pathAfterIncomingStore(false, request)).toBe(loginContinuePath(request));
     expect(loginContinuePath(request).startsWith("/login?")).toBe(true);
+  });
+
+  it("finishes an already-verified hop instead of showing a login error", () => {
+    expect(destinationWhenAlreadyVerified(request, true)).toBe(ssoIncomingPath(request));
+    expect(destinationWhenAlreadyVerified(request, false)).toBe(loginContinuePath(request));
+    expect(destinationWhenAlreadyVerified(null, true)).toBe("/account");
+    expect(destinationWhenAlreadyVerified(null, false)).toBe("/login");
   });
 });

@@ -180,6 +180,20 @@ export function pathAfterIncomingStore(hasStore: boolean, request: ContinueReque
   return hasStore ? "/continue" : loginContinuePath(request);
 }
 
+/**
+ * A second verify/resend after the email is already active must finish the
+ * product hop — not dump the user on /login with a dead-end error.
+ */
+export function destinationWhenAlreadyVerified(
+  request: ContinueRequest | null,
+  hasSession: boolean,
+): string {
+  if (request) {
+    return hasSession ? ssoIncomingPath(request) : loginContinuePath(request);
+  }
+  return hasSession ? "/account" : "/login";
+}
+
 export function continueFromUnknown(input: {
   client?: unknown;
   return_to?: unknown;
