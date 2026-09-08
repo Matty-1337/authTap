@@ -145,7 +145,10 @@ describe("same-site incoming hop", () => {
   it("finishes an already-verified hop instead of showing a login error", () => {
     expect(destinationWhenAlreadyVerified(request, true)).toBe(ssoIncomingPath(request));
     expect(destinationWhenAlreadyVerified(request, false)).toBe(loginContinuePath(request));
-    expect(destinationWhenAlreadyVerified(null, true)).toBe("/account");
+    // No product hop: the account is verified but AuthTAP cannot add it to the
+    // store without credentials, so route to sign-in (not the warehouse, which
+    // would omit the freshly verified account) regardless of an existing session.
+    expect(destinationWhenAlreadyVerified(null, true)).toBe("/login");
     expect(destinationWhenAlreadyVerified(null, false)).toBe("/login");
   });
 });

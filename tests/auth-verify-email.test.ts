@@ -106,6 +106,42 @@ describe("POST /api/auth/verify-email", () => {
     expect(handoffToProduct).not.toHaveBeenCalled();
   });
 
+  it("verifying without a hop lands on the account list with the new account signed in", async () => {
+    vi.mocked(dkVerifyEmail).mockResolvedValue({ ok: true, token: "new-token", user });
+
+    const res = await postVerify(verifyReq({ email: "fancy@example.com", code: "123456" }));
+    const data = (await res.json()) as { ok?: boolean; url?: string };
+    expect(data.ok).toBe(true);
+    expect(new URL(data.url ?? "").pathname).toBe("/account");
+    expect(res.cookies.get("at_session")?.value).toBeTruthy();
+  });
+
+  it("appends the freshly verified account to an existing session instead of replacing it", async () => {
+    const existing = { id: 42, name: "Already", email: "already@example.com" };
+    const priorSession = await new SignJWT({
+      accounts: [{ token: "prior", user: existing }],
+      activeUserId: existing.id,
+    })
+      .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+      .setIssuedAt()
+      .setExpirationTime("14d")
+      .sign(new TextEncoder().encode(sessionSecret()));
+
+    vi.mocked(dkVerifyEmail).mockResolvedValue({ ok: true, token: "new-token", user });
+
+    const res = await postVerify(
+      verifyReq({ email: "fancy@example.com", code: "123456" }, `at_session=${priorSession}`),
+    );
+    const cookie = res.cookies.get("at_session")?.value ?? "";
+    expect(cookie).toBeTruthy();
+
+    const { jwtVerify } = await import("jose");
+    const { payload } = await jwtVerify(cookie, new TextEncoder().encode(sessionSecret()));
+    const ids = (payload.accounts as { user: { id: number } }[]).map((a) => a.user.id).sort();
+    expect(ids).toEqual([1, 42]);
+    expect(payload.activeUserId).toBe(user.id);
+  });
+
   it("keeps the product hop from at_continue when the verify form omits it", async () => {
     vi.mocked(dkVerifyEmail).mockResolvedValue({ ok: true, token: "core-token", user });
     const continueToken = await new SignJWT({

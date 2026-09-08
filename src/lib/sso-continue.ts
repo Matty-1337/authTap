@@ -191,7 +191,12 @@ export function destinationWhenAlreadyVerified(
   if (request) {
     return hasSession ? ssoIncomingPath(request) : loginContinuePath(request);
   }
-  return hasSession ? "/account" : "/login";
+  // No product hop: the email is verified, but AuthTAP has no proof of identity
+  // here (the code was consumed and there is no password). Routing to /account
+  // would show a session that does not include this freshly verified account.
+  // Send the user to sign-in (email prefilled from the pending cookie) so
+  // logging in adds the account to the store.
+  return "/login";
 }
 
 export function continueFromUnknown(input: {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  attachPendingEmailCookie,
   attachPendingVerifyCookie,
   clearPendingVerifyCookie,
   parsePendingVerifyEmail,
@@ -62,6 +63,10 @@ export async function POST(req: NextRequest) {
         ? NextResponse.json({ ok: true, alreadyVerified: true, url: dest.toString() })
         : NextResponse.redirect(dest, 303);
       if (continueRequest) await attachContinueCookie(res, continueRequest);
+      // Prefill the email on the sign-in page so the user can add this verified
+      // account to the store (AuthTAP has no session for it yet without a hop).
+      if (!continueRequest) attachPendingEmailCookie(res, "login", email);
+      clearPendingVerifyCookie(res);
       return res;
     }
     const dest = applyContinueParams(
@@ -87,6 +92,7 @@ export async function POST(req: NextRequest) {
     user: result.user,
     continueRequest,
     origin: publicOrigin(req),
+    existingStore: await verifyAccountStore(req.cookies.get(SESSION_COOKIE)?.value),
   });
   if (!finished.ok) {
     const dest = applyContinueParams(publicUrl(verifyEmailPath(finished.error), req), continueRequest);
