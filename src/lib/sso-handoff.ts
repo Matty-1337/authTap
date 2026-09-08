@@ -2,6 +2,7 @@ import "server-only";
 
 import { SignJWT } from "jose";
 import { dkBackendUrl, ssoSecret } from "@/lib/env";
+import { handoffErrorFromResponse } from "@/lib/sso-handoff-error";
 import type { ContinueRequest, SsoClient } from "@/lib/sso-continue";
 
 type HandoffUser = { id: number; name: string; email: string };
@@ -9,7 +10,7 @@ type HandoffAccount = { token: string; user: HandoffUser };
 
 export type HandoffResult =
   | { ok: true; token: string; user: HandoffUser }
-  | { ok: false; error: string };
+  | { ok: false; error: string; stale?: boolean };
 
 function productFor(client: SsoClient): string {
   switch (client) {
@@ -38,6 +39,7 @@ export async function handoffToProduct(account: HandoffAccount, client: SsoClien
         Authorization: `Bearer ${account.token}`,
         Accept: "application/json",
         "Content-Type": "application/json",
+        "X-Product": "coretap",
       },
       body: JSON.stringify({ product: productFor(client) }),
       cache: "no-store",
@@ -48,12 +50,7 @@ export async function handoffToProduct(account: HandoffAccount, client: SsoClien
 
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
-    const message =
-      data.reason === "email_unverified"
-        ? "Verify your email to finish creating this account."
-        : (typeof data.message === "string" && data.message) ||
-          (res.status === 403 ? "This account does not have access." : "Could not continue into the app.");
-    return { ok: false, error: message };
+    return { ok: false, ...handoffErrorFromResponse(res.status, data) };
   }
 
   const token = (data.token ?? data.access_token) as string | undefined;
