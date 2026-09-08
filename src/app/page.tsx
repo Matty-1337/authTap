@@ -3,7 +3,7 @@ import { AuthPanel } from "@/components/AuthPanel";
 import { BrandSplash } from "@/components/BrandSplash";
 import { readPendingEmail } from "@/lib/auth-flow";
 import { isAddingAccount, readSession } from "@/lib/session";
-import { afterAuthPath, parseContinueInput } from "@/lib/sso-continue";
+import { afterAuthPath, parseContinueInput, ssoIncomingPath } from "@/lib/sso-continue";
 
 type HomePageProps = {
   searchParams: Promise<{ error?: string; client?: string; return_to?: string; state?: string }>;
@@ -15,9 +15,7 @@ export default async function Home({ searchParams }: HomePageProps) {
   if (session && !adding) {
     const pending = parseContinueInput(params);
     if (pending) {
-      redirect(
-        `/api/sso/incoming?client=${encodeURIComponent(pending.client)}&return_to=${encodeURIComponent(pending.returnTo)}&state=${encodeURIComponent(pending.state)}`,
-      );
+      redirect(ssoIncomingPath(pending));
     }
     redirect(await afterAuthPath());
   }

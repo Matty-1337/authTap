@@ -3,7 +3,7 @@ import { VerifyEmailForm } from "@/components/VerifyEmailForm";
 import { AuthWordmark } from "@/components/AuthWordmark";
 import { readPendingVerifyEmail } from "@/lib/auth-flow";
 import { isAddingAccount, readSession } from "@/lib/session";
-import { afterAuthPath, parseContinueInput } from "@/lib/sso-continue";
+import { afterAuthPath, parseContinueInput, ssoIncomingPath } from "@/lib/sso-continue";
 
 type VerifyEmailPageProps = {
   searchParams: Promise<{ error?: string; email?: string; client?: string; return_to?: string; state?: string }>;
@@ -15,9 +15,7 @@ export default async function VerifyEmailPage({ searchParams }: VerifyEmailPageP
   const pending = parseContinueInput(params);
   if (session && !adding) {
     if (pending) {
-      redirect(
-        `/api/sso/incoming?client=${encodeURIComponent(pending.client)}&return_to=${encodeURIComponent(pending.returnTo)}&state=${encodeURIComponent(pending.state)}`,
-      );
+      redirect(ssoIncomingPath(pending));
     }
     redirect(await afterAuthPath());
   }

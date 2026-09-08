@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { AuthPanel } from "@/components/AuthPanel";
 import { readPendingEmail } from "@/lib/auth-flow";
 import { isAddingAccount, readSession } from "@/lib/session";
-import { afterAuthPath, parseContinueInput } from "@/lib/sso-continue";
+import { afterAuthPath, parseContinueInput, ssoIncomingPath } from "@/lib/sso-continue";
 
 type RegisterPageProps = {
   searchParams: Promise<{ error?: string; client?: string; return_to?: string; state?: string }>;
@@ -14,9 +14,7 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
   if (session && !adding) {
     const pending = parseContinueInput(params);
     if (pending) {
-      redirect(
-        `/api/sso/incoming?client=${encodeURIComponent(pending.client)}&return_to=${encodeURIComponent(pending.returnTo)}&state=${encodeURIComponent(pending.state)}`,
-      );
+      redirect(ssoIncomingPath(pending));
     }
     redirect(await afterAuthPath());
   }

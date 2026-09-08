@@ -26,19 +26,31 @@ function incomingReq(cookie = "") {
 }
 
 describe("GET /api/sso/incoming", () => {
-  it("sends a signed-in user to the account picker even with one account", async () => {
+  it("bounces to the same-site page even when a session cookie is on this request", async () => {
     const session = await signSession();
     const res = await incoming(incomingReq(`at_session=${session}`));
     expect(res.status).toBe(307);
-    expect(new URL(res.headers.get("location") ?? "").pathname).toBe("/continue");
-    expect(res.cookies.get("at_continue")?.value).toBeTruthy();
+    const location = new URL(res.headers.get("location") ?? "");
+    expect(location.pathname).toBe("/sso/incoming");
+    expect(location.searchParams.get("client")).toBe("coretap");
+    expect(location.searchParams.get("return_to")).toBe("http://localhost:3000/auth/authtap/callback");
+    expect(location.searchParams.get("state")).toBe("state-token-1");
+    expect(res.cookies.get("at_continue")?.value).toBeFalsy();
   });
 
-  it("asks for a password only when AuthTAP has no session", async () => {
+  it("does not decide login on the cross-site hop", async () => {
     const res = await incoming(incomingReq());
     expect(res.status).toBe(307);
     const location = new URL(res.headers.get("location") ?? "");
-    expect(location.pathname).toBe("/login");
+    expect(location.pathname).toBe("/sso/incoming");
     expect(location.searchParams.get("client")).toBe("coretap");
+  });
+
+  it("sends a broken hop to the account warehouse", async () => {
+    const url = new URL("http://localhost:3004/api/sso/incoming");
+    url.searchParams.set("client", "coretap");
+    const res = await incoming(new NextRequest(url));
+    expect(res.status).toBe(307);
+    expect(new URL(res.headers.get("location") ?? "").pathname).toBe("/account");
   });
 });
