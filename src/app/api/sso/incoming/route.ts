@@ -26,8 +26,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Do not read at_session here. Product hops are cross-site (especially
-  // core-tap.com → AuthTAP). Lax cookies often miss this first request, and
-  // cookies() in a Route Handler can miss them even when they arrive. Bounce
-  // to a same-site page that reads the jar the same way /account does.
+  // core-tap.com → AuthTAP). Lax cookies often miss this first request.
+  // Bounce to a same-site route that can read the cookie and set at_continue.
   return NextResponse.redirect(publicUrl(ssoIncomingPath(request), req));
 }

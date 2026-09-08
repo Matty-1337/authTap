@@ -119,15 +119,6 @@ export async function attachContinueCookie(res: NextResponse, request: ContinueR
   });
 }
 
-/** Set at_continue from a Server Component — same jar /account uses. */
-export async function writeContinueRequest(request: ContinueRequest): Promise<void> {
-  const jar = await cookies();
-  jar.set(CONTINUE_COOKIE, await signContinueToken(request), {
-    ...cookieBase(),
-    maxAge: CONTINUE_TTL_SECONDS,
-  });
-}
-
 /** Read at_continue from a raw cookie value — not from cookies() after writes. */
 export async function parseContinueCookie(raw: string | undefined | null): Promise<ContinueRequest | null> {
   if (!raw) return null;
@@ -175,7 +166,7 @@ function continuePath(pathname: string, request: ContinueRequest): string {
   return `${url.pathname}${url.search}`;
 }
 
-/** Same-site document hop that can read at_session the way /account does. */
+/** Same-site hop that can read at_session after the cross-site product bounce. */
 export function ssoIncomingPath(request: ContinueRequest): string {
   return continuePath("/sso/incoming", request);
 }
