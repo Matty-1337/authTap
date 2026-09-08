@@ -2,9 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { publicUrl } from "@/lib/public-origin";
 import { SESSION_COOKIE, verifyAccountStore } from "@/lib/session";
 import { attachContinueCookie, parseContinueInput } from "@/lib/sso-continue";
-import { isStaleHandoff } from "@/lib/sso-handoff-error";
-import { handoffToProduct, signHandoffCode } from "@/lib/sso-handoff";
-import { redirectToLoginAfterStaleHandoff } from "@/lib/sso-reauth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,28 +39,9 @@ export async function GET(req: NextRequest) {
     return res;
   }
 
-  if (store.accounts.length !== 1) {
-    const res = NextResponse.redirect(publicUrl("/continue", req));
-    await attachContinueCookie(res, request);
-    return res;
-  }
-
-  const account = store.accounts[0];
-  const handoff = await handoffToProduct(account, request.client);
-  if (!handoff.ok) {
-    if (isStaleHandoff(handoff)) {
-      return redirectToLoginAfterStaleHandoff(req, request);
-    }
-    const res = NextResponse.redirect(
-      publicUrl(`/continue?error=${encodeURIComponent(handoff.error)}`, req),
-    );
-    await attachContinueCookie(res, request);
-    return res;
-  }
-
-  const code = await signHandoffCode({ request, token: handoff.token, user: handoff.user });
-  const dest = new URL(request.returnTo);
-  dest.searchParams.set("code", code);
-  dest.searchParams.set("state", request.state);
-  return NextResponse.redirect(dest);
+  // Always pick on /continue — even with one account. Auto-handoff skipped
+  // the picker; a dead production token then wiped the session to /login.
+  const res = NextResponse.redirect(publicUrl("/continue", req));
+  await attachContinueCookie(res, request);
+  return res;
 }

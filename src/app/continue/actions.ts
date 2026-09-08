@@ -1,10 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { beginAddAccount, clearSession, readAccountStore } from "@/lib/session";
+import { beginAddAccount, readAccountStore } from "@/lib/session";
 import { denyContinue } from "@/lib/sso-complete";
-import { applyContinueParams, clearContinueRequest, productHandoffUrl, readContinueRequest } from "@/lib/sso-continue";
-import { isStaleHandoff } from "@/lib/sso-handoff-error";
+import { clearContinueRequest, productHandoffUrl, readContinueRequest } from "@/lib/sso-continue";
 import { handoffToProduct, signHandoffCode } from "@/lib/sso-handoff";
 
 export type ContinueActionState = {
@@ -27,11 +26,6 @@ export async function continueWithAccount(
 
   const handoff = await handoffToProduct(account, request.client);
   if (!handoff.ok) {
-    if (isStaleHandoff(handoff)) {
-      await clearSession();
-      const dest = applyContinueParams(new URL("/login", "http://authtap.local"), request);
-      redirect(`${dest.pathname}${dest.search}`);
-    }
     return { error: handoff.error };
   }
 
