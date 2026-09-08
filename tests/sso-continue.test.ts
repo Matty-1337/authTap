@@ -2,8 +2,11 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   applyContinueParams,
   isAllowedReturnTo,
+  loginContinuePath,
   parseContinueInput,
+  pathAfterIncomingStore,
   productHandoffUrl,
+  ssoIncomingPath,
 } from "@/lib/sso-continue";
 
 beforeEach(() => {
@@ -108,5 +111,27 @@ describe("AuthTAP SSO continue — coretap client", () => {
     expect(isAllowedReturnTo("coretap", "http://localhost:3000/auth/authtap/callback")).toBe(true);
     expect(isAllowedReturnTo("coretap", "http://core-tap.local:3000/auth/authtap/callback")).toBe(true);
     expect(isAllowedReturnTo("coretap", "http://joes.core-tap.local:3000/auth/authtap/callback")).toBe(false);
+  });
+});
+
+describe("same-site incoming hop", () => {
+  const request = {
+    client: "coretap" as const,
+    returnTo: "https://core-tap.com/auth/authtap/callback",
+    state: "state-token-1",
+  };
+
+  it("keeps the hop on /sso/incoming", () => {
+    const path = ssoIncomingPath(request);
+    expect(path.startsWith("/sso/incoming?")).toBe(true);
+    expect(path).toContain("client=coretap");
+    expect(path).toContain("return_to=");
+    expect(path).toContain("state=state-token-1");
+  });
+
+  it("sends a signed-in hop to the picker and an unsigned hop to login", () => {
+    expect(pathAfterIncomingStore(true, request)).toBe("/continue");
+    expect(pathAfterIncomingStore(false, request)).toBe(loginContinuePath(request));
+    expect(loginContinuePath(request).startsWith("/login?")).toBe(true);
   });
 });

@@ -161,6 +161,25 @@ export function applyContinueParams(url: URL, request: ContinueRequest | null): 
   return url;
 }
 
+function continuePath(pathname: string, request: ContinueRequest): string {
+  const url = applyContinueParams(new URL(pathname, "https://authtap.invalid"), request);
+  return `${url.pathname}${url.search}`;
+}
+
+/** Same-site hop that can read at_session after the cross-site product bounce. */
+export function ssoIncomingPath(request: ContinueRequest): string {
+  return continuePath("/sso/incoming", request);
+}
+
+export function loginContinuePath(request: ContinueRequest): string {
+  return continuePath("/login", request);
+}
+
+/** After the same-site hop: picker if signed in, password only if not. */
+export function pathAfterIncomingStore(hasStore: boolean, request: ContinueRequest): string {
+  return hasStore ? "/continue" : loginContinuePath(request);
+}
+
 export function continueFromUnknown(input: {
   client?: unknown;
   return_to?: unknown;

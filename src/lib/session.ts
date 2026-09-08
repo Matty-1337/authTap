@@ -193,6 +193,10 @@ export function clearSessionCookies(res: NextResponse): void {
   res.cookies.set(ADDING_COOKIE, "", { ...cookieBase(), maxAge: 0 });
 }
 
+export function clearAddingCookie(res: NextResponse): void {
+  res.cookies.set(ADDING_COOKIE, "", { ...cookieBase(), maxAge: 0 });
+}
+
 export async function beginAddAccount(): Promise<void> {
   const jar = await cookies();
   jar.set(ADDING_COOKIE, "1", { ...cookieBase(), maxAge: 60 * 20 });
