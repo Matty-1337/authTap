@@ -7,7 +7,9 @@ import {
   parseContinueInput,
   productHandoffUrl,
 } from "@/lib/sso-continue";
+import { isStaleHandoff } from "@/lib/sso-handoff-error";
 import { handoffToProduct, signHandoffCode } from "@/lib/sso-handoff";
+import { redirectToLoginAfterStaleHandoff } from "@/lib/sso-reauth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +43,9 @@ async function finish(req: NextRequest, userId?: number) {
 
   const handoff = await handoffToProduct(account, request.client);
   if (!handoff.ok) {
+    if (isStaleHandoff(handoff)) {
+      return redirectToLoginAfterStaleHandoff(req, request);
+    }
     const dest = publicUrl("/continue", req);
     dest.searchParams.set("error", handoff.error);
     return NextResponse.redirect(dest);
