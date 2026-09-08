@@ -47,7 +47,7 @@ describe("GET /api/sso/complete", () => {
     vi.mocked(handoffToProduct).mockReset()
   })
 
-  it("sends a dead Sanctum token back to login instead of showing Unauthenticated", async () => {
+  it("keeps the account picker when a product token is stale", async () => {
     vi.mocked(handoffToProduct).mockResolvedValue({
       ok: false,
       error: "Your session expired. Sign in again.",
@@ -62,10 +62,8 @@ describe("GET /api/sso/complete", () => {
 
     expect(res.status).toBe(307)
     const location = new URL(res.headers.get("location") ?? "")
-    expect(location.pathname).toBe("/login")
-    expect(location.searchParams.get("client")).toBe("coretap")
-    expect(location.searchParams.get("return_to")).toBe(continueRequest.returnTo)
-    expect(location.searchParams.get("state")).toBe(continueRequest.state)
-    expect(res.cookies.get("at_session")?.value).toBe("")
+    expect(location.pathname).toBe("/continue")
+    expect(location.searchParams.get("error")).toBe("Your session expired. Sign in again.")
+    expect(res.cookies.get("at_session")?.value).toBeUndefined()
   })
 })
