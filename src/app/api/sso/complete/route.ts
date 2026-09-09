@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { publicUrl } from "@/lib/public-origin";
-import { SESSION_COOKIE, verifyAccountStore } from "@/lib/session";
+import {
+  SESSION_COOKIE,
+  attachSessionStore,
+  clearSessionCookies,
+  dropAccountFromStore,
+  verifyAccountStore,
+} from "@/lib/session";
 import {
   CONTINUE_COOKIE,
+  applyContinueParams,
   parseContinueCookie,
   parseContinueInput,
   productHandoffUrl,
 } from "@/lib/sso-continue";
 import { handoffToProduct, signHandoffCode } from "@/lib/sso-handoff";
+import { isStaleHandoff } from "@/lib/sso-handoff-error";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +49,21 @@ async function finish(req: NextRequest, userId?: number) {
 
   const handoff = await handoffToProduct(account, request.client);
   if (!handoff.ok) {
+    // A stale (401) handoff means the stored AuthTAP token was revoked (e.g. an
+    // older product logout). Do not dead-end on "session expired": drop the dead
+    // account and send the user to /login to re-mint a fresh token, keeping the
+    // product hop so they still land back in the requesting product.
+    if (isStaleHandoff(handoff)) {
+      const dest = applyContinueParams(publicUrl("/login", req), request);
+      const res = NextResponse.redirect(dest, 303);
+      const next = dropAccountFromStore(store, account.user.id);
+      if (next) {
+        await attachSessionStore(res, next);
+      } else {
+        clearSessionCookies(res);
+      }
+      return res;
+    }
     const dest = publicUrl("/continue", req);
     dest.searchParams.set("error", handoff.error);
     return NextResponse.redirect(dest);
