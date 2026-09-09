@@ -47,7 +47,11 @@ describe("GET /api/sso/complete", () => {
     vi.mocked(handoffToProduct).mockReset()
   })
 
-  it("keeps the account picker when a product token is stale", async () => {
+  it("recovers to /login and evicts the dead account when a token is stale", async () => {
+    // A stale (401) handoff means the stored token was revoked. Rather than
+    // dead-ending on "session expired", AuthTAP evicts the dead account and
+    // sends the user to /login to re-mint — keeping the product hop so they
+    // still land back in the requesting product.
     vi.mocked(handoffToProduct).mockResolvedValue({
       ok: false,
       error: "Your session expired. Sign in again.",
@@ -60,10 +64,12 @@ describe("GET /api/sso/complete", () => {
       }),
     )
 
-    expect(res.status).toBe(307)
+    expect(res.status).toBe(303)
     const location = new URL(res.headers.get("location") ?? "")
-    expect(location.pathname).toBe("/continue")
-    expect(location.searchParams.get("error")).toBe("Your session expired. Sign in again.")
-    expect(res.cookies.get("at_session")?.value).toBeUndefined()
+    expect(location.pathname).toBe("/login")
+    // Product hop preserved so re-login lands back in the requesting product.
+    expect(location.searchParams.get("client")).toBe("coretap")
+    // The sole (dead) account is evicted → session cookie cleared.
+    expect(res.cookies.get("at_session")?.value).toBe("")
   })
 })

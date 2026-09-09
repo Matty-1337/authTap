@@ -1,10 +1,16 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { beginAddAccount, readAccountStore } from "@/lib/session";
+import {
+  beginAddAccount,
+  dropAccountFromStore,
+  persistAccountStore,
+  readAccountStore,
+} from "@/lib/session";
 import { denyContinue } from "@/lib/sso-complete";
 import { clearContinueRequest, productHandoffUrl, readContinueRequest } from "@/lib/sso-continue";
 import { handoffToProduct, signHandoffCode } from "@/lib/sso-handoff";
+import { isStaleHandoff } from "@/lib/sso-handoff-error";
 
 export type ContinueActionState = {
   error: string;
@@ -26,6 +32,12 @@ export async function continueWithAccount(
 
   const handoff = await handoffToProduct(account, request.client);
   if (!handoff.ok) {
+    // Stale (401): the stored token was revoked. Evict the dead account and
+    // send the user to /login to re-mint, keeping the product hop intact.
+    if (isStaleHandoff(handoff) && store) {
+      await persistAccountStore(dropAccountFromStore(store, account.user.id));
+      redirect("/login");
+    }
     return { error: handoff.error };
   }
 

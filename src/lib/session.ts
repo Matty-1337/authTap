@@ -88,6 +88,18 @@ async function persistStore(store: AccountStore): Promise<void> {
   });
 }
 
+/**
+ * Persist a store via cookies() (server action / route handler context), or
+ * clear the session cookie when the store is null (no accounts left).
+ */
+export async function persistAccountStore(store: AccountStore | null): Promise<void> {
+  if (!store) {
+    await clearSession();
+    return;
+  }
+  await persistStore(store);
+}
+
 export async function verifySession(raw: string | undefined | null): Promise<SessionData | null> {
   const store = await verifyAccountStore(raw);
   if (!store) return null;
@@ -134,6 +146,24 @@ export function mergeAccountIntoStore(
   }
   store.activeUserId = data.user.id;
   return { ok: true, store };
+}
+
+/**
+ * Pure store edit: return a copy without the given account, re-pointing
+ * activeUserId, or null when no accounts remain. Unlike removeAccount, this
+ * does NOT touch cookies or fan out a product logout — the caller decides how
+ * to persist. Used to evict a dead (revoked-token) account during a continue.
+ */
+export function dropAccountFromStore(
+  store: AccountStore,
+  userId: number,
+): AccountStore | null {
+  const accounts = store.accounts.filter((account) => account.user.id !== userId);
+  if (!accounts.length) return null;
+  const activeUserId = accounts.some((account) => account.user.id === store.activeUserId)
+    ? store.activeUserId
+    : accounts[0].user.id;
+  return { accounts, activeUserId };
 }
 
 export async function attachSessionStore(res: NextResponse, store: AccountStore): Promise<void> {
