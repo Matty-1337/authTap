@@ -49,6 +49,21 @@ export function signaltapReturnOrigins(): string[] {
   return [...new Set(["http://localhost:3001", ...extras])];
 }
 
+export function shifttapReturnOrigins(): string[] {
+  const extras = required("SHIFTTAP_RETURN_ORIGINS")
+    .split(",")
+    .map((origin) => origin.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+  return [
+    ...new Set([
+      "http://localhost:3005",
+      "https://shifttap.deltakinetics.io",
+      "https://shiftap.deltakinetics.io",
+      ...extras,
+    ]),
+  ];
+}
+
 export function coretapReturnOrigins(): string[] {
   const extras = required("CORETAP_RETURN_ORIGINS")
     .split(",")
