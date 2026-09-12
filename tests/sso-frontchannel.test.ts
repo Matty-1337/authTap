@@ -6,6 +6,7 @@ beforeEach(() => {
   process.env.CORETAP_RETURN_ORIGINS = "http://localhost:6100";
   process.env.NEXUSTAP_RETURN_ORIGINS = "http://localhost:3002";
   process.env.SIGNALTAP_RETURN_ORIGINS = "http://localhost:3001";
+  process.env.SHIFTTAP_RETURN_ORIGINS = "http://localhost:3005";
 });
 
 describe("AuthTAP front-channel chain", () => {
@@ -35,13 +36,14 @@ describe("AuthTAP front-channel chain", () => {
     expect(first.searchParams.get("next")).toBe("http://localhost:3004/login");
   });
 
-  it("includes CoreTAP then NexusTAP then Signal TAP before AuthTAP login", () => {
+  it("includes CoreTAP then NexusTAP then SignalTAP then ShiftTAP before AuthTAP login", () => {
     delete process.env.AUTHTAP_FRONTCHANNEL_CLIENTS;
     const apps = productFrontchannelApps();
     expect(apps.map((app) => `${app.origin}${app.path}`)).toEqual([
       "http://localhost:6100/api/auth/sso/authtap/frontchannel-logout",
       "http://localhost:3002/api/auth/sso/authtap/frontchannel-logout",
       "http://localhost:3001/auth/sso/authtap/frontchannel-logout",
+      "http://localhost:3005/api/auth/sso/authtap/frontchannel-logout",
     ]);
 
     const dest = afterLastAccountSignOutUrl("http://localhost:3004");
@@ -57,6 +59,10 @@ describe("AuthTAP front-channel chain", () => {
     expect(third.origin + third.pathname).toBe(
       "http://localhost:3001/auth/sso/authtap/frontchannel-logout",
     );
-    expect(third.searchParams.get("next")).toBe("http://localhost:3004/login");
+    const fourth = new URL(third.searchParams.get("next")!);
+    expect(fourth.origin + fourth.pathname).toBe(
+      "http://localhost:3005/api/auth/sso/authtap/frontchannel-logout",
+    );
+    expect(fourth.searchParams.get("next")).toBe("http://localhost:3004/login");
   });
 });
