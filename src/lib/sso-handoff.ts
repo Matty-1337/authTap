@@ -20,6 +20,8 @@ function productFor(client: SsoClient): string {
       return "nexustap";
     case "signaltap":
       return "signaltap";
+    case "shifttap":
+      return "shifttap";
     default:
       return exhaustive(client);
   }
