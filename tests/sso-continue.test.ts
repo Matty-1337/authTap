@@ -15,6 +15,28 @@ beforeEach(() => {
   process.env.SIGNALTAP_RETURN_ORIGINS = "http://localhost:3001";
   process.env.NEXUSTAP_RETURN_ORIGINS = "http://localhost:3002";
   process.env.CORETAP_RETURN_ORIGINS = "http://localhost:6100";
+  process.env.SHIFTTAP_RETURN_ORIGINS = "http://localhost:3005";
+});
+
+describe("AuthTAP SSO continue — shifttap client", () => {
+  it("accepts client=shifttap with the product callback", () => {
+    const parsed = parseContinueInput({
+      client: "shifttap",
+      return_to: "http://localhost:3005/auth/authtap/callback",
+      state: "state-token-st",
+    });
+    expect(parsed).toEqual({
+      client: "shifttap",
+      returnTo: "http://localhost:3005/auth/authtap/callback",
+      state: "state-token-st",
+    });
+  });
+
+  it("accepts production shifttap origin", () => {
+    expect(
+      isAllowedReturnTo("shifttap", "https://shifttap.deltakinetics.io/auth/authtap/callback"),
+    ).toBe(true);
+  });
 });
 
 describe("AuthTAP SSO continue — signaltap client", () => {

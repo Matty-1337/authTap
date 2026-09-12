@@ -1,10 +1,16 @@
 import "server-only";
 
-import { coretapReturnOrigins, nexustapReturnOrigins, signaltapReturnOrigins } from "@/lib/env";
+import {
+  coretapReturnOrigins,
+  nexustapReturnOrigins,
+  shifttapReturnOrigins,
+  signaltapReturnOrigins,
+} from "@/lib/env";
 
 const CORETAP_FRONTCHANNEL_PATH = "/api/auth/sso/authtap/frontchannel-logout";
 const NEXUSTAP_FRONTCHANNEL_PATH = "/api/auth/sso/authtap/frontchannel-logout";
 const SIGNALTAP_FRONTCHANNEL_PATH = "/auth/sso/authtap/frontchannel-logout";
+const SHIFTTAP_FRONTCHANNEL_PATH = "/api/auth/sso/authtap/frontchannel-logout";
 
 export type FrontchannelApp = { origin: string; path: string };
 
@@ -51,7 +57,16 @@ function signaltapAppOrigin(): string {
   );
 }
 
-const FRONTCHANNEL_CLIENTS = ["coretap", "nexustap", "signaltap"] as const;
+function shifttapAppOrigin(): string {
+  return firstConfiguredOrigin(
+    process.env.SHIFTTAP_RETURN_ORIGINS,
+    shifttapReturnOrigins(),
+    "3005",
+    "http://localhost:3005",
+  );
+}
+
+const FRONTCHANNEL_CLIENTS = ["coretap", "nexustap", "signaltap", "shifttap"] as const;
 type FrontchannelClient = (typeof FRONTCHANNEL_CLIENTS)[number];
 
 function isFrontchannelClient(value: string): value is FrontchannelClient {
@@ -69,6 +84,8 @@ function appsForClient(client: FrontchannelClient): FrontchannelApp[] {
       return [{ origin: nexustapAppOrigin(), path: NEXUSTAP_FRONTCHANNEL_PATH }];
     case "signaltap":
       return [{ origin: signaltapAppOrigin(), path: SIGNALTAP_FRONTCHANNEL_PATH }];
+    case "shifttap":
+      return [{ origin: shifttapAppOrigin(), path: SHIFTTAP_FRONTCHANNEL_PATH }];
     default: {
       const _never: never = client;
       throw new Error(`Unhandled front-channel client: ${String(_never)}`);
