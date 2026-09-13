@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   const json = wantsJson(req);
 
   if (!email || code.length !== 6) {
-    const dest = applyContinueParams(publicUrl(verifyEmailPath("Enter the 6-digit code."), req), continueRequest);
+    const dest = applyContinueParams(publicUrl(verifyEmailPath("Enter the 6-digit code.", email), req), continueRequest);
     if (json) {
       const res = NextResponse.json({ ok: false, error: "Enter the 6-digit code." });
       if (email) attachPendingVerifyCookie(res, email);
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       return res;
     }
     const dest = applyContinueParams(
-      publicUrl(verifyEmailPath(result.ok ? "Enter the 6-digit code." : result.error), req),
+      publicUrl(verifyEmailPath(result.ok ? "Enter the 6-digit code." : result.error, email), req),
       continueRequest,
     );
     if (json) {
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
     existingStore: await verifyAccountStore(req.cookies.get(SESSION_COOKIE)?.value),
   });
   if (!finished.ok) {
-    const dest = applyContinueParams(publicUrl(verifyEmailPath(finished.error), req), continueRequest);
+    const dest = applyContinueParams(publicUrl(verifyEmailPath(finished.error, email), req), continueRequest);
     if (json) return NextResponse.json({ ok: false, error: finished.error });
     return NextResponse.redirect(dest, 303);
   }

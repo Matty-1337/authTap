@@ -73,9 +73,27 @@ function normalizeVerifyEmail(value: string): string {
   return value.trim().toLowerCase();
 }
 
-export function verifyEmailPath(error?: string): string {
-  if (!error) return "/verify-email";
-  return `/verify-email?error=${encodeURIComponent(error)}`;
+export function verifyEmailPath(error?: string, email?: string): string {
+  const dest = new URL("/verify-email", "http://authtap.local");
+  const verified = normalizeVerifyEmail(email ?? "");
+  if (verified) dest.searchParams.set("email", verified);
+  if (error) dest.searchParams.set("error", error);
+  return `${dest.pathname}${dest.search}`;
+}
+
+/**
+ * The address we told the user we emailed. Never the signed-in session:
+ * adding a new account while Fancy is still in at_session used to show
+ * fancy@gmail.com on the verify page.
+ */
+export function resolveVerifyPageEmail(input: {
+  pendingVerifyEmail?: string | null;
+  queryEmail?: string | null;
+}): string {
+  return (
+    normalizeVerifyEmail(input.pendingVerifyEmail ?? "") ||
+    normalizeVerifyEmail(input.queryEmail ?? "")
+  );
 }
 
 export function pathFor(mode: AuthMode, error?: string): string {

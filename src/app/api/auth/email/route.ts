@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { attachPendingEmailCookie, pathFor } from "@/lib/auth-flow";
+import { attachPendingEmailCookie, clearPendingVerifyCookie, pathFor } from "@/lib/auth-flow";
 import { isValidEmail, normalizeEmail } from "@/lib/auth-sign-in";
 import type { AuthMode } from "@/lib/auth-types";
 import { publicUrl } from "@/lib/public-origin";
@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
   const dest = applyContinueParams(publicUrl(pathFor(mode), req), continueRequest);
   const res = NextResponse.redirect(dest, 303);
   attachPendingEmailCookie(res, mode, email);
+  clearPendingVerifyCookie(res);
   if (continueRequest) await attachContinueCookie(res, continueRequest);
   return res;
 }
