@@ -21,6 +21,7 @@ vi.mock("@/lib/sso-handoff", () => ({
 import { POST as postEmail } from "@/app/api/auth/email/route";
 import { GET as leaveVerify } from "@/app/api/auth/leave-verify/route";
 import { POST as postSignIn } from "@/app/api/auth/sign-in/route";
+import { resolveVerifyPageEmail } from "@/lib/auth-flow";
 import { completePasswordSignIn } from "@/lib/auth-sign-in";
 import { dkAccountVerified, dkLogin, dkRegister, dkResendVerification } from "@/lib/dk-auth";
 import { sessionSecret } from "@/lib/env";
@@ -201,6 +202,20 @@ describe("POST /api/auth/email", () => {
     expect(location.searchParams.get("return_to")).toBe("http://localhost:3000/auth/authtap/callback");
     expect(location.searchParams.get("state")).toBe("state-token-1");
   });
+
+  it("clears a leftover pending-verify email when a new signup email is entered", async () => {
+    const res = await postEmail(
+      formRequest(
+        "http://localhost:3004/api/auth/email",
+        { mode: "register", email: "new@example.com" },
+        "at_pending_verify=fancy@gmail.com",
+      ),
+    );
+
+    expect(res.status).toBe(303);
+    expect(res.cookies.get("at_pending_email")?.value).toBe("register:new@example.com");
+    expect(res.cookies.get("at_pending_verify")?.value).toBe("");
+  });
 });
 
 describe("POST /api/auth/sign-in", () => {
@@ -299,9 +314,50 @@ describe("POST /api/auth/sign-in", () => {
     expect(res.status).toBe(303);
     const location = new URL(res.headers.get("location") ?? "");
     expect(location.origin + location.pathname).toBe("http://localhost:3004/verify-email");
+    expect(location.searchParams.get("email")).toBe("new@example.com");
     expect(res.cookies.get("at_session")?.value).toBeUndefined();
     expect(res.cookies.get("at_pending_verify")?.value).toBe("new@example.com");
     expect(handoffToProduct).not.toHaveBeenCalled();
+  });
+
+  it("registers the form email even if a leftover pending-email cookie is Fancy", async () => {
+    vi.mocked(dkRegister).mockResolvedValue({
+      ok: true,
+      needsVerification: true,
+      email: "new@example.com",
+    });
+
+    const res = await postSignIn(
+      formRequest(
+        "http://localhost:3004/api/auth/sign-in",
+        { mode: "register", email: "new@example.com", password: "secret123" },
+        "at_pending_email=register:fancy@gmail.com",
+      ),
+    );
+
+    expect(dkRegister).toHaveBeenCalledWith("new@example.com", "secret123", expect.anything());
+    expect(res.status).toBe(303);
+    const location = new URL(res.headers.get("location") ?? "");
+    expect(location.searchParams.get("email")).toBe("new@example.com");
+    expect(res.cookies.get("at_pending_verify")?.value).toBe("new@example.com");
+  });
+});
+
+describe("resolveVerifyPageEmail", () => {
+  it("never uses a signed-in session email — pending verify wins over the query string", () => {
+    expect(
+      resolveVerifyPageEmail({
+        pendingVerifyEmail: "new@example.com",
+        queryEmail: "fancy@gmail.com",
+      }),
+    ).toBe("new@example.com");
+  });
+
+  it("falls back to the query email when the pending-verify cookie is empty", () => {
+    expect(resolveVerifyPageEmail({ pendingVerifyEmail: "", queryEmail: "new@example.com" })).toBe(
+      "new@example.com",
+    );
+    expect(resolveVerifyPageEmail({ pendingVerifyEmail: null, queryEmail: null })).toBe("");
   });
 });
 

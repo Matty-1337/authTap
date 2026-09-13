@@ -7,7 +7,7 @@ import {
   pathFor,
   verifyEmailPath,
 } from "@/lib/auth-flow";
-import { completePasswordSignIn, redirectLocation } from "@/lib/auth-sign-in";
+import { completePasswordSignIn, isValidEmail, normalizeEmail, redirectLocation } from "@/lib/auth-sign-in";
 import type { AuthMode } from "@/lib/auth-types";
 import { clientContextFrom } from "@/lib/dk-auth";
 import { turnstileTokenFromForm } from "@/lib/turnstile";
@@ -56,12 +56,14 @@ export async function POST(req: NextRequest) {
     req.cookies.get(CONTINUE_COOKIE)?.value,
   );
   const pendingEmail = parsePendingEmail(req.cookies.get(PENDING_EMAIL_COOKIE)?.value, mode);
+  const formEmail = normalizeEmail(String(form.get("email") ?? ""));
+  const email = isValidEmail(formEmail) ? formEmail : pendingEmail;
   const existingStore = await verifyAccountStore(req.cookies.get(SESSION_COOKIE)?.value);
 
   const result = await completePasswordSignIn({
     mode,
     password: String(form.get("password") ?? ""),
-    pendingEmail,
+    pendingEmail: email,
     continueRequest,
     existingStore,
     client: clientContextFrom(req, turnstileTokenFromForm(form)),
@@ -78,7 +80,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (result.needsVerification) {
-    const dest = applyContinueParams(publicUrl(verifyEmailPath(), req), continueRequest);
+    const dest = applyContinueParams(publicUrl(verifyEmailPath(undefined, result.email), req), continueRequest);
     const res = NextResponse.redirect(dest, 303);
     attachPendingVerifyCookie(res, result.email);
     clearPendingEmailCookie(res);

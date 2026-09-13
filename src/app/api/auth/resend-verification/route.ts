@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const dest = applyContinueParams(publicUrl(verifyEmailPath(), req), continueRequest);
+  const dest = applyContinueParams(publicUrl(verifyEmailPath(undefined, email), req), continueRequest);
   const res = NextResponse.redirect(dest, 303);
   if (email) attachPendingVerifyCookie(res, email);
   if (continueRequest) await attachContinueCookie(res, continueRequest);

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { VerifyEmailForm } from "@/components/VerifyEmailForm";
 import { AuthWordmark } from "@/components/AuthWordmark";
-import { readPendingVerifyEmail } from "@/lib/auth-flow";
+import { readPendingVerifyEmail, resolveVerifyPageEmail } from "@/lib/auth-flow";
 import { isAddingAccount, readSession } from "@/lib/session";
 import { afterAuthPath, continueFromSearchOrJar, ssoIncomingPath } from "@/lib/sso-continue";
 
@@ -13,15 +13,17 @@ export default async function VerifyEmailPage({ searchParams }: VerifyEmailPageP
   const params = await searchParams;
   const [session, adding] = await Promise.all([readSession(), isAddingAccount()]);
   const pending = await continueFromSearchOrJar(params);
-  if (session && !adding) {
-    if (pending) {
-      redirect(ssoIncomingPath(pending));
-    }
-    redirect(await afterAuthPath());
-  }
-
-  const email = params.email?.trim().toLowerCase() || session?.user.email || (await readPendingVerifyEmail());
+  const email = resolveVerifyPageEmail({
+    pendingVerifyEmail: await readPendingVerifyEmail(),
+    queryEmail: params.email,
+  });
   if (!email) {
+    if (session && !adding) {
+      if (pending) {
+        redirect(ssoIncomingPath(pending));
+      }
+      redirect(await afterAuthPath());
+    }
     redirect("/register");
   }
 
