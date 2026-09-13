@@ -44,4 +44,10 @@ describe("parseError", () => {
       "Confirm you are not a robot, then try again.",
     );
   });
+
+  it("maps invalid_credentials to a credentials message, not a captcha one", () => {
+    const msg = parseError({ reason: "invalid_credentials", message: "Invalid credentials" }, "fallback");
+    expect(msg).toBe("Email or password is wrong.");
+    expect(msg).not.toContain("robot");
+  });
 });

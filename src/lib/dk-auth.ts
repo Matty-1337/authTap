@@ -29,8 +29,13 @@ export function clientContextFrom(req: Request, turnstileToken = ""): DkClientCo
 }
 
 export function parseError(data: Record<string, unknown>, fallback: string): string {
+  // Only a genuine Turnstile challenge should surface the captcha message.
   if (data.reason === "turnstile_required") {
     return "Confirm you are not a robot, then try again.";
+  }
+  // A wrong email/password must read as a credentials error, never a captcha one.
+  if (data.reason === "invalid_credentials") {
+    return "Email or password is wrong.";
   }
   if (data.reason === "email_unverified") {
     return "Verify your email to finish creating this account.";
