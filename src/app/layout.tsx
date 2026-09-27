@@ -11,6 +11,7 @@ const outfit = Outfit({
 export const metadata: Metadata = {
   title: "AuthTAP",
   description: "One account. Every TAP.",
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
