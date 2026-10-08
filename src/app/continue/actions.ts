@@ -8,7 +8,14 @@ import {
   readAccountStore,
 } from "@/lib/session";
 import { denyContinue } from "@/lib/sso-complete";
-import { afterAuthPath, clearContinueRequest, productHandoffUrl, readContinueRequest } from "@/lib/sso-continue";
+import {
+  OIDC_BRIDGE_PATH,
+  afterAuthPath,
+  clearContinueRequest,
+  isOidcHop,
+  productHandoffUrl,
+  readContinueRequest,
+} from "@/lib/sso-continue";
 import { handoffToProduct, signHandoffCode } from "@/lib/sso-handoff";
 import { isStaleHandoff } from "@/lib/sso-handoff-error";
 
@@ -28,6 +35,11 @@ export async function continueWithAccount(
   const account = store?.accounts.find((entry) => entry.user.id === userId);
   if (!account) {
     return { error: "Choose an account to continue." };
+  }
+
+  if (isOidcHop(request) && store) {
+    await persistAccountStore({ ...store, activeUserId: account.user.id });
+    redirect(OIDC_BRIDGE_PATH);
   }
 
   const handoff = await handoffToProduct(account, request.client);

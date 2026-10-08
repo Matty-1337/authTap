@@ -2,7 +2,9 @@ import "server-only";
 
 import { redirect } from "next/navigation";
 import {
+  OIDC_BRIDGE_PATH,
   clearContinueRequest,
+  isOidcHop,
   productHandoffUrl,
   productLoginUrl,
   readContinueRequest,
@@ -37,6 +39,8 @@ export async function destinationAfterSignIn(
   request: ContinueRequest | null,
 ): Promise<SignInDestination> {
   if (!request) return { url: strayUrl(), clearContinue: false };
+  // The bridge page reads the account from at_session and clears at_continue itself.
+  if (isOidcHop(request)) return { url: OIDC_BRIDGE_PATH, clearContinue: false };
 
   const handoff = await handoffToProduct(account, request.client);
   if (!handoff.ok) {

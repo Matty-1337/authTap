@@ -22,6 +22,8 @@ function productFor(client: SsoClient): string {
       return "signaltap";
     case "shifttap":
       return "shifttap";
+    case "oidc":
+      throw new Error("An OIDC hop bridges a dk-backend session; it does not mint a product token.");
     default:
       return exhaustive(client);
   }

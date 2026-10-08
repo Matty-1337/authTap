@@ -7,6 +7,7 @@ import { strayUrl } from "@/lib/sso-account-continue";
 import {
   coretapReturnOrigins,
   nexustapReturnOrigins,
+  oidcIssuerOrigins,
   sessionSecret,
   shifttapReturnOrigins,
   signaltapReturnOrigins,
@@ -15,8 +16,27 @@ import {
 export const CONTINUE_COOKIE = "at_continue";
 export const CONTINUE_TTL_SECONDS = 60 * 30;
 
-export const SSO_CLIENTS = ["coretap", "nexustap", "signaltap", "shifttap"] as const;
+/**
+ * Products that redeem an AuthTAP handoff code, plus "oidc": a product that
+ * signs in through dk-backend's own OIDC authorize endpoint (ShiftTAP's
+ * console, LearnTAP, AtlasTAP). dk-backend bounces a signed-out authorize to
+ * AuthTAP /sso/authorize; AuthTAP signs the person in and bridges a dk-backend
+ * web session back so the authorize can finish. One hop, two ways to end it.
+ */
+export const SSO_CLIENTS = ["coretap", "nexustap", "signaltap", "shifttap", "oidc"] as const;
 export type SsoClient = (typeof SSO_CLIENTS)[number];
+
+/** Where an OIDC hop ends on AuthTAP: the page that posts the session to dk-backend. */
+export const OIDC_BRIDGE_PATH = "/sso/authorize/bridge";
+
+export function isOidcHop(request: ContinueRequest | null | undefined): request is ContinueRequest & { client: "oidc" } {
+  return request?.client === "oidc";
+}
+
+/** dk-backend's bridge endpoint on the same host the authorize URL names. */
+export function oidcBridgePostUrl(request: ContinueRequest): string {
+  return `${new URL(request.returnTo).origin}/sso/session/bridge`;
+}
 
 export type ContinueRequest = {
   client: SsoClient;
@@ -51,6 +71,8 @@ function allowedOriginsFor(client: SsoClient): string[] {
       return signaltapReturnOrigins();
     case "shifttap":
       return shifttapReturnOrigins();
+    case "oidc":
+      return oidcIssuerOrigins();
     default:
       return exhaustive(client);
   }
@@ -63,6 +85,8 @@ function callbackPathFor(client: SsoClient): string {
     case "signaltap":
     case "shifttap":
       return "/auth/authtap/callback";
+    case "oidc":
+      return "/oauth/authorize";
     default:
       return exhaustive(client);
   }
@@ -80,10 +104,16 @@ export function isAllowedReturnTo(client: SsoClient, returnTo: string): boolean 
     return false;
   }
   if (parsed.pathname !== callbackPathFor(client)) return false;
-  if (parsed.search || parsed.hash) return false;
+  if (parsed.hash) return false;
   if (parsed.username || parsed.password) return false;
 
   const origin = parsed.origin;
+  if (client === "oidc") {
+    // The authorize URL carries the product's client_id, PKCE challenge and
+    // state in its query, and may only point at dk-backend itself.
+    return allowedOriginsFor(client).includes(origin);
+  }
+  if (parsed.search) return false;
   if (allowedOriginsFor(client).includes(origin)) return true;
 
   const host = parsed.hostname.toLowerCase();
@@ -253,6 +283,9 @@ export function destinationAfterVerify(request: ContinueRequest | null): string 
 }
 
 export function productLoginUrl(request: ContinueRequest, error?: string): string {
+  // An authorize URL names dk-backend, not the product; the product's own login
+  // is unknown here, so a cancelled OIDC hop leaves AuthTAP instead.
+  if (isOidcHop(request)) return strayUrl();
   const url = new URL("/login", request.returnTo);
   if (error) url.searchParams.set("error", error);
   return url.toString();
