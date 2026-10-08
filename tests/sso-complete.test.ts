@@ -10,6 +10,8 @@ vi.mock("@/lib/sso-continue", () => ({
     return dest.toString();
   },
   productLoginUrl: vi.fn(),
+  isOidcHop: (request: { client?: string } | null) => request?.client === "oidc",
+  OIDC_BRIDGE_PATH: "/sso/authorize/bridge",
 }));
 
 vi.mock("@/lib/sso-handoff", () => ({

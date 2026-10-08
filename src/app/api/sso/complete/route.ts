@@ -9,7 +9,9 @@ import {
 } from "@/lib/session";
 import {
   CONTINUE_COOKIE,
+  OIDC_BRIDGE_PATH,
   applyContinueParams,
+  isOidcHop,
   parseContinueCookie,
   parseContinueInput,
   productHandoffUrl,
@@ -46,6 +48,14 @@ async function finish(req: NextRequest, userId?: number) {
         : null;
   if (!account) {
     return NextResponse.redirect(publicUrl("/continue", req));
+  }
+
+  if (isOidcHop(request)) {
+    // Make the chosen account the active one; the bridge page posts that
+    // account's token to dk-backend and clears the hop.
+    const res = NextResponse.redirect(publicUrl(OIDC_BRIDGE_PATH, req), 303);
+    await attachSessionStore(res, { ...store, activeUserId: account.user.id });
+    return res;
   }
 
   const handoff = await handoffToProduct(account, request.client);

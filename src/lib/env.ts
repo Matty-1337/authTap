@@ -10,6 +10,18 @@ export function dkBackendUrl(): string {
   return required("DK_BACKEND_URL", fallback).replace(/\/$/, "");
 }
 
+/**
+ * Origins whose /oauth/authorize an OIDC hop may return to: dk-backend, with
+ * and without the www label, because APP_URL carries www while products are
+ * configured against the bare host.
+ */
+export function oidcIssuerOrigins(): string[] {
+  const base = new URL(dkBackendUrl());
+  const host = base.hostname.startsWith("www.") ? base.hostname.slice(4) : base.hostname;
+  const port = base.port ? `:${base.port}` : "";
+  return [...new Set([base.origin, `${base.protocol}//${host}${port}`, `${base.protocol}//www.${host}${port}`])];
+}
+
 export function dkLoginProduct(): string {
   return required("DK_LOGIN_PRODUCT", "coretap");
 }
