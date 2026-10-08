@@ -159,18 +159,17 @@ describe("same-site incoming hop", () => {
     expect(loginContinuePath(request).startsWith("/login?")).toBe(true);
   });
 
-  it("sends a product-hop verify to Continue instead of the warehouse", () => {
+  it("sends a product-hop verify to Continue and a hop-less verify off AuthTAP", () => {
     expect(destinationAfterVerify(request)).toBe("/continue");
-    expect(destinationAfterVerify(null)).toBe("/account");
+    expect(destinationAfterVerify(null)).toBe("https://deltakinetics.io");
   });
 
   it("finishes an already-verified hop instead of showing a login error", () => {
     expect(destinationWhenAlreadyVerified(request, true)).toBe(ssoIncomingPath(request));
     expect(destinationWhenAlreadyVerified(request, false)).toBe(loginContinuePath(request));
-    // No product hop: the account is verified but AuthTAP cannot add it to the
-    // store without credentials, so route to sign-in (not the warehouse, which
-    // would omit the freshly verified account) regardless of an existing session.
-    expect(destinationWhenAlreadyVerified(null, true)).toBe("/login");
-    expect(destinationWhenAlreadyVerified(null, false)).toBe("/login");
+    // No product hop: there is no product to return to, so leave AuthTAP
+    // regardless of an existing session.
+    expect(destinationWhenAlreadyVerified(null, true)).toBe("https://deltakinetics.io");
+    expect(destinationWhenAlreadyVerified(null, false)).toBe("https://deltakinetics.io");
   });
 });

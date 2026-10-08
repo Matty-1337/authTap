@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { clearPendingEmailCookie } from "@/lib/auth-flow";
-import { publicOrigin, publicUrl } from "@/lib/public-origin";
 import { removeAccount, removeActiveAccount } from "@/lib/session";
 import { afterLastAccountSignOutUrl } from "@/lib/sso-frontchannel";
 import { clearContinueRequest } from "@/lib/sso-continue";
+import { strayUrl } from "@/lib/sso-account-continue";
 
 export const dynamic = "force-dynamic";
 
@@ -19,10 +19,10 @@ export async function POST(request: Request) {
 
   if (stillSignedIn) {
     await clearContinueRequest();
-    return NextResponse.redirect(publicUrl("/account", request), 303);
+    return NextResponse.redirect(strayUrl(), 303);
   }
 
-  const dest = afterLastAccountSignOutUrl(publicOrigin(request));
+  const dest = afterLastAccountSignOutUrl();
   await clearContinueRequest();
   const res = NextResponse.redirect(dest, 303);
   // Do not resurrect the just-signed-out email at the password step on the

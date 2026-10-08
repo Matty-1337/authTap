@@ -106,13 +106,13 @@ describe("POST /api/auth/verify-email", () => {
     expect(handoffToProduct).not.toHaveBeenCalled();
   });
 
-  it("verifying without a hop lands on the account list with the new account signed in", async () => {
+  it("verifying without a hop leaves AuthTAP with the new account signed in", async () => {
     vi.mocked(dkVerifyEmail).mockResolvedValue({ ok: true, token: "new-token", user });
 
     const res = await postVerify(verifyReq({ email: "fancy@example.com", code: "123456" }));
     const data = (await res.json()) as { ok?: boolean; url?: string };
     expect(data.ok).toBe(true);
-    expect(new URL(data.url ?? "").pathname).toBe("/account");
+    expect(data.url).toBe("https://deltakinetics.io");
     expect(res.cookies.get("at_session")?.value).toBeTruthy();
   });
 

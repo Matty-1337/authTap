@@ -8,7 +8,7 @@ import {
   readAccountStore,
 } from "@/lib/session";
 import { denyContinue } from "@/lib/sso-complete";
-import { clearContinueRequest, productHandoffUrl, readContinueRequest } from "@/lib/sso-continue";
+import { afterAuthPath, clearContinueRequest, productHandoffUrl, readContinueRequest } from "@/lib/sso-continue";
 import { handoffToProduct, signHandoffCode } from "@/lib/sso-handoff";
 import { isStaleHandoff } from "@/lib/sso-handoff-error";
 
@@ -21,7 +21,7 @@ export async function continueWithAccount(
   formData: FormData,
 ): Promise<ContinueActionState> {
   const request = await readContinueRequest();
-  if (!request) redirect("/account");
+  if (!request) redirect(await afterAuthPath());
 
   const userId = Number(formData.get("userId"));
   const store = await readAccountStore();

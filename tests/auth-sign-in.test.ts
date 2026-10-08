@@ -106,7 +106,7 @@ describe("completePasswordSignIn", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok || result.needsVerification) return;
-    expect(result.dest).toEqual({ url: "/account", clearContinue: false });
+    expect(result.dest).toEqual({ url: "https://deltakinetics.io", clearContinue: false });
     expect(dkResendVerification).not.toHaveBeenCalled();
   });
 
@@ -123,7 +123,7 @@ describe("completePasswordSignIn", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok || result.needsVerification) return;
-    expect(result.dest).toEqual({ url: "/account", clearContinue: false });
+    expect(result.dest).toEqual({ url: "https://deltakinetics.io", clearContinue: false });
     expect(dkResendVerification).not.toHaveBeenCalled();
   });
 
@@ -150,7 +150,7 @@ describe("completePasswordSignIn", () => {
     expect(url.searchParams.get("state")).toBe("state-token-1");
   });
 
-  it("returns /account when there is no in-flight continue", async () => {
+  it("leaves AuthTAP when there is no in-flight continue", async () => {
     vi.mocked(dkLogin).mockResolvedValue({ ok: true, token: "core-token", user });
     const result = await completePasswordSignIn({
       mode: "login",
@@ -161,7 +161,7 @@ describe("completePasswordSignIn", () => {
     });
     expect(result.ok).toBe(true);
     if (!result.ok || result.needsVerification) return;
-    expect(result.dest).toEqual({ url: "/account", clearContinue: false });
+    expect(result.dest).toEqual({ url: "https://deltakinetics.io", clearContinue: false });
     expect(handoffToProduct).not.toHaveBeenCalled();
   });
 });
@@ -291,8 +291,7 @@ describe("POST /api/auth/sign-in", () => {
     );
 
     expect(res.status).toBe(303);
-    const location = new URL(res.headers.get("location") ?? "");
-    expect(location.origin + location.pathname).toBe("http://localhost:3004/account");
+    expect(res.headers.get("location")).toBe("https://deltakinetics.io/");
     expect(res.cookies.get("at_session")?.value).toBeTruthy();
   });
 

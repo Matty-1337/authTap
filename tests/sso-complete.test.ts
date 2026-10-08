@@ -40,9 +40,9 @@ describe("finishContinue", () => {
     vi.mocked(signHandoffCode).mockReset();
   });
 
-  it("returns /account when there is no in-flight SSO continue", async () => {
+  it("leaves AuthTAP when there is no in-flight SSO continue", async () => {
     vi.mocked(readContinueRequest).mockResolvedValue(null);
-    await expect(finishContinue(account)).resolves.toBe("/account");
+    await expect(finishContinue(account)).resolves.toBe("https://deltakinetics.io");
     expect(handoffToProduct).not.toHaveBeenCalled();
     expect(clearContinueRequest).not.toHaveBeenCalled();
   });

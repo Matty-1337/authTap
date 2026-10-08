@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { hasSsoQuery, shouldClearLeftoverContinue, ssoCompletePath } from "@/lib/sso-account-continue";
+import { afterEach, describe, expect, it } from "vitest";
+import { hasSsoQuery, isStrayVisit, ssoCompletePath, strayUrl } from "@/lib/sso-account-continue";
 import { afterAuthPath } from "@/lib/sso-continue";
 
 describe("ssoCompletePath", () => {
@@ -61,13 +61,39 @@ describe("ssoCompletePath", () => {
   });
 });
 
-describe("shouldClearLeftoverContinue", () => {
-  it("keeps the hop on login and register so signup can finish", () => {
-    expect(shouldClearLeftoverContinue("/login", false)).toBe(false);
-    expect(shouldClearLeftoverContinue("/register", false)).toBe(false);
-    expect(shouldClearLeftoverContinue("/", false)).toBe(true);
-    expect(shouldClearLeftoverContinue("/account", false)).toBe(true);
-    expect(shouldClearLeftoverContinue("/account", true)).toBe(false);
+const AUTH_PAGES = ["/", "/login", "/register", "/continue", "/verify-email"];
+
+describe("isStrayVisit", () => {
+  it("treats a visit no product started as a stray on every AuthTAP page", () => {
+    for (const pathname of AUTH_PAGES) {
+      expect(isStrayVisit({ pathname, hasSsoQuery: false, hasContinue: false })).toBe(true);
+    }
+  });
+
+  it("keeps every step of a product hop, by query or by at_continue", () => {
+    for (const pathname of AUTH_PAGES) {
+      expect(isStrayVisit({ pathname, hasSsoQuery: true, hasContinue: false })).toBe(false);
+      expect(isStrayVisit({ pathname, hasSsoQuery: false, hasContinue: true })).toBe(false);
+    }
+  });
+
+  it("never serves the old account page, even mid-hop", () => {
+    expect(isStrayVisit({ pathname: "/account", hasSsoQuery: true, hasContinue: true })).toBe(true);
+  });
+});
+
+describe("strayUrl", () => {
+  afterEach(() => {
+    delete process.env.AUTHTAP_STRAY_URL;
+  });
+
+  it("defaults to the Delta Kinetics site", () => {
+    expect(strayUrl()).toBe("https://deltakinetics.io");
+  });
+
+  it("honours AUTHTAP_STRAY_URL without a trailing slash", () => {
+    process.env.AUTHTAP_STRAY_URL = "https://example.test/";
+    expect(strayUrl()).toBe("https://example.test");
   });
 });
 
@@ -82,7 +108,7 @@ describe("hasSsoQuery", () => {
 });
 
 describe("afterAuthPath", () => {
-  it("stays on the AuthTAP account warehouse", async () => {
-    await expect(afterAuthPath()).resolves.toBe("/account");
+  it("leaves AuthTAP when there is no product hop", async () => {
+    await expect(afterAuthPath()).resolves.toBe("https://deltakinetics.io");
   });
 });

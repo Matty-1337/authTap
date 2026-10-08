@@ -15,6 +15,7 @@ import {
   productHandoffUrl,
 } from "@/lib/sso-continue";
 import { handoffToProduct, signHandoffCode } from "@/lib/sso-handoff";
+import { strayUrl } from "@/lib/sso-account-continue";
 import { isStaleHandoff } from "@/lib/sso-handoff-error";
 
 export const runtime = "nodejs";
@@ -29,7 +30,7 @@ async function finish(req: NextRequest, userId?: number) {
   });
   const request = fromCookie ?? fromQuery;
   if (!request) {
-    return NextResponse.redirect(publicUrl("/account", req));
+    return NextResponse.redirect(strayUrl());
   }
 
   const store = await verifyAccountStore(req.cookies.get(SESSION_COOKIE)?.value);

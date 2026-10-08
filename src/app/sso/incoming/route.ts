@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { publicUrl } from "@/lib/public-origin";
+import { strayUrl } from "@/lib/sso-account-continue";
 import { SESSION_COOKIE, clearAddingCookie, verifyAccountStore } from "@/lib/session";
 import { attachContinueCookie, parseContinueInput, pathAfterIncomingStore } from "@/lib/sso-continue";
 
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest) {
     state: req.nextUrl.searchParams.get("state") ?? "",
   });
   if (!request) {
-    return NextResponse.redirect(publicUrl("/account", req));
+    return NextResponse.redirect(strayUrl());
   }
 
   // Same-site hop after /api/sso/incoming. Read at_session from this request
