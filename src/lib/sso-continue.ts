@@ -3,6 +3,7 @@ import "server-only";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
+import { strayUrl } from "@/lib/sso-account-continue";
 import {
   coretapReturnOrigins,
   nexustapReturnOrigins,
@@ -157,8 +158,9 @@ export async function clearContinueRequest(): Promise<void> {
   jar.delete(CONTINUE_COOKIE);
 }
 
+/** With no product hop there is nowhere on AuthTAP to go. */
 export async function afterAuthPath(): Promise<string> {
-  return "/account";
+  return strayUrl();
 }
 
 /** Keep client/return_to/state on AuthTAP /login after the email step. */
@@ -184,9 +186,14 @@ export function loginContinuePath(request: ContinueRequest): string {
   return continuePath("/login", request);
 }
 
-/** After the same-site hop: picker if signed in, password only if not. */
-export function pathAfterIncomingStore(hasStore: boolean, request: ContinueRequest): string {
-  return hasStore ? "/continue" : loginContinuePath(request);
+/**
+ * After the same-site hop. One signed-in account goes straight back to the
+ * product with no extra click; two or more get the picker; none gets the
+ * password step. The picker is only skipped when there is nothing to pick.
+ */
+export function pathAfterIncoming(accountCount: number, request: ContinueRequest): string {
+  if (accountCount <= 0) return loginContinuePath(request);
+  return accountCount === 1 ? "/api/sso/complete" : "/continue";
 }
 
 /**
@@ -200,12 +207,9 @@ export function destinationWhenAlreadyVerified(
   if (request) {
     return hasSession ? ssoIncomingPath(request) : loginContinuePath(request);
   }
-  // No product hop: the email is verified, but AuthTAP has no proof of identity
-  // here (the code was consumed and there is no password). Routing to /account
-  // would show a session that does not include this freshly verified account.
-  // Send the user to sign-in (email prefilled from the pending cookie) so
-  // logging in adds the account to the store.
-  return "/login";
+  // No product hop: the email is verified, but there is no product to return
+  // to from here. The client signs in again from the product they use.
+  return strayUrl();
 }
 
 export function continueFromUnknown(input: {
@@ -243,9 +247,9 @@ export async function continueFromSearchOrJar(params: {
   return parseContinueInput(params) ?? (await readContinueRequest());
 }
 
-/** After email verify, a product hop stays on the picker — not the warehouse. */
+/** After email verify, a product hop stays on the picker. */
 export function destinationAfterVerify(request: ContinueRequest | null): string {
-  return request ? "/continue" : "/account";
+  return request ? "/continue" : strayUrl();
 }
 
 export function productLoginUrl(request: ContinueRequest, error?: string): string {

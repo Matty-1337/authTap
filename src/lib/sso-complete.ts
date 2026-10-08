@@ -9,6 +9,7 @@ import {
   type ContinueRequest,
 } from "@/lib/sso-continue";
 import { handoffToProduct, signHandoffCode } from "@/lib/sso-handoff";
+import { strayUrl } from "@/lib/sso-account-continue";
 
 type ContinueAccount = {
   token: string;
@@ -18,7 +19,7 @@ type ContinueAccount = {
 export async function denyContinue(request: ContinueRequest | null): Promise<never> {
   await clearContinueRequest();
   if (request) redirect(productLoginUrl(request, "sso_denied"));
-  redirect("/account");
+  redirect(strayUrl());
 }
 
 export type SignInDestination = {
@@ -35,7 +36,7 @@ export async function destinationAfterSignIn(
   account: ContinueAccount,
   request: ContinueRequest | null,
 ): Promise<SignInDestination> {
-  if (!request) return { url: "/account", clearContinue: false };
+  if (!request) return { url: strayUrl(), clearContinue: false };
 
   const handoff = await handoffToProduct(account, request.client);
   if (!handoff.ok) {

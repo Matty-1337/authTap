@@ -106,13 +106,13 @@ describe("POST /api/auth/verify-email", () => {
     expect(handoffToProduct).not.toHaveBeenCalled();
   });
 
-  it("verifying without a hop lands on the account list with the new account signed in", async () => {
+  it("verifying without a hop leaves AuthTAP with the new account signed in", async () => {
     vi.mocked(dkVerifyEmail).mockResolvedValue({ ok: true, token: "new-token", user });
 
     const res = await postVerify(verifyReq({ email: "fancy@example.com", code: "123456" }));
     const data = (await res.json()) as { ok?: boolean; url?: string };
     expect(data.ok).toBe(true);
-    expect(new URL(data.url ?? "").pathname).toBe("/account");
+    expect(data.url).toBe("https://deltakinetics.io");
     expect(res.cookies.get("at_session")?.value).toBeTruthy();
   });
 
@@ -140,6 +140,18 @@ describe("POST /api/auth/verify-email", () => {
     const ids = (payload.accounts as { user: { id: number } }[]).map((a) => a.user.id).sort();
     expect(ids).toEqual([1, 42]);
     expect(payload.activeUserId).toBe(user.id);
+  });
+
+  it("keeps the product hop from the verify form after at_continue has expired", async () => {
+    vi.mocked(dkVerifyEmail).mockResolvedValue({ ok: true, token: "core-token", user });
+
+    const res = await postVerify(verifyReq(continueFields, "at_continue=expired-and-unverifiable"));
+    const data = (await res.json()) as { ok?: boolean; url?: string };
+    expect(data.ok).toBe(true);
+    expect(new URL(data.url ?? "").pathname).toBe("/continue");
+    const fresh = res.cookies.get("at_continue")?.value ?? "";
+    expect(fresh).toBeTruthy();
+    expect(fresh).not.toBe("expired-and-unverifiable");
   });
 
   it("keeps the product hop from at_continue when the verify form omits it", async () => {

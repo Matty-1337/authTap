@@ -106,7 +106,7 @@ describe("completePasswordSignIn", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok || result.needsVerification) return;
-    expect(result.dest).toEqual({ url: "/account", clearContinue: false });
+    expect(result.dest).toEqual({ url: "https://deltakinetics.io", clearContinue: false });
     expect(dkResendVerification).not.toHaveBeenCalled();
   });
 
@@ -123,7 +123,7 @@ describe("completePasswordSignIn", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok || result.needsVerification) return;
-    expect(result.dest).toEqual({ url: "/account", clearContinue: false });
+    expect(result.dest).toEqual({ url: "https://deltakinetics.io", clearContinue: false });
     expect(dkResendVerification).not.toHaveBeenCalled();
   });
 
@@ -150,7 +150,7 @@ describe("completePasswordSignIn", () => {
     expect(url.searchParams.get("state")).toBe("state-token-1");
   });
 
-  it("returns /account when there is no in-flight continue", async () => {
+  it("leaves AuthTAP when there is no in-flight continue", async () => {
     vi.mocked(dkLogin).mockResolvedValue({ ok: true, token: "core-token", user });
     const result = await completePasswordSignIn({
       mode: "login",
@@ -161,7 +161,7 @@ describe("completePasswordSignIn", () => {
     });
     expect(result.ok).toBe(true);
     if (!result.ok || result.needsVerification) return;
-    expect(result.dest).toEqual({ url: "/account", clearContinue: false });
+    expect(result.dest).toEqual({ url: "https://deltakinetics.io", clearContinue: false });
     expect(handoffToProduct).not.toHaveBeenCalled();
   });
 });
@@ -291,8 +291,7 @@ describe("POST /api/auth/sign-in", () => {
     );
 
     expect(res.status).toBe(303);
-    const location = new URL(res.headers.get("location") ?? "");
-    expect(location.origin + location.pathname).toBe("http://localhost:3004/account");
+    expect(res.headers.get("location")).toBe("https://deltakinetics.io/");
     expect(res.cookies.get("at_session")?.value).toBeTruthy();
   });
 
@@ -318,6 +317,38 @@ describe("POST /api/auth/sign-in", () => {
     expect(res.cookies.get("at_session")?.value).toBeUndefined();
     expect(res.cookies.get("at_pending_verify")?.value).toBe("new@example.com");
     expect(handoffToProduct).not.toHaveBeenCalled();
+  });
+
+  it("sends a login that still needs verification to the verify step with the product hop", async () => {
+    vi.mocked(dkLogin).mockResolvedValue({
+      ok: true,
+      needsVerification: true,
+      email: "new@example.com",
+    });
+
+    const res = await postSignIn(
+      formRequest(
+        "http://localhost:3004/api/auth/sign-in",
+        {
+          mode: "login",
+          password: "secret123",
+          client: "coretap",
+          return_to: "http://localhost:3000/auth/authtap/callback",
+          state: "state-token-1",
+        },
+        "at_pending_email=login:new@example.com",
+      ),
+    );
+
+    expect(res.status).toBe(303);
+    const location = new URL(res.headers.get("location") ?? "");
+    expect(location.origin + location.pathname).toBe("http://localhost:3004/verify-email");
+    expect(location.searchParams.get("email")).toBe("new@example.com");
+    expect(location.searchParams.get("client")).toBe("coretap");
+    expect(location.searchParams.get("state")).toBe("state-token-1");
+    expect(res.cookies.get("at_continue")?.value).toBeTruthy();
+    expect(res.cookies.get("at_pending_verify")?.value).toBe("new@example.com");
+    expect(res.cookies.get("at_session")?.value).toBeUndefined();
   });
 
   it("registers the form email even if a leftover pending-email cookie is Fancy", async () => {

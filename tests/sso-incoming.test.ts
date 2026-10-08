@@ -47,12 +47,12 @@ describe("GET /api/sso/incoming", () => {
     expect(location.searchParams.get("client")).toBe("coretap");
   });
 
-  it("sends a broken hop to the account warehouse", async () => {
+  it("sends a broken hop off AuthTAP", async () => {
     const url = new URL("http://localhost:3004/api/sso/incoming");
     url.searchParams.set("client", "coretap");
     const res = await incoming(new NextRequest(url));
     expect(res.status).toBe(307);
-    expect(new URL(res.headers.get("location") ?? "").pathname).toBe("/account");
+    expect(res.headers.get("location")).toBe("https://deltakinetics.io/");
   });
 });
 
@@ -65,13 +65,24 @@ describe("GET /sso/incoming", () => {
     return new NextRequest(url, { headers: cookie ? { cookie } : {} });
   }
 
-  it("sends a signed-in hop to the picker and writes at_continue", async () => {
+  it("sends a hop with one signed-in account straight to the product and writes at_continue", async () => {
     const session = await signSession();
     const res = await sameSiteIncoming(hopReq(`at_session=${session}; at_adding=1`));
     expect(res.status).toBe(307);
-    expect(new URL(res.headers.get("location") ?? "").pathname).toBe("/continue");
+    expect(new URL(res.headers.get("location") ?? "").pathname).toBe("/api/sso/complete");
     expect(res.cookies.get("at_continue")?.value).toBeTruthy();
     expect(res.cookies.get("at_adding")?.value).toBe("");
+  });
+
+  it("keeps the picker when two accounts are signed in", async () => {
+    const session = await signSession([
+      { token: "tok", user },
+      { token: "tok2", user: { id: 2, name: "Bob", email: "bob@example.com" } },
+    ]);
+    const res = await sameSiteIncoming(hopReq(`at_session=${session}`));
+    expect(res.status).toBe(307);
+    expect(new URL(res.headers.get("location") ?? "").pathname).toBe("/continue");
+    expect(res.cookies.get("at_continue")?.value).toBeTruthy();
   });
 
   it("asks for a password only when this same-site hop has no session", async () => {

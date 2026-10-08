@@ -3,7 +3,7 @@ import { ContinuePicker } from "@/app/continue/ContinuePicker";
 import { AuthTapMark } from "@/components/AuthTapMark";
 import { AuthWordmark } from "@/components/AuthWordmark";
 import { readAccountStore } from "@/lib/session";
-import { readContinueRequest } from "@/lib/sso-continue";
+import { afterAuthPath, readContinueRequest } from "@/lib/sso-continue";
 
 type ContinuePageProps = {
   searchParams: Promise<{ error?: string }>;
@@ -11,7 +11,7 @@ type ContinuePageProps = {
 
 export default async function ContinuePage({ searchParams }: ContinuePageProps) {
   const request = await readContinueRequest();
-  if (!request) redirect("/account");
+  if (!request) redirect(await afterAuthPath());
 
   const store = await readAccountStore();
   if (!store) redirect("/login");

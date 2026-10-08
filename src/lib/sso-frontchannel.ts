@@ -6,6 +6,7 @@ import {
   shifttapReturnOrigins,
   signaltapReturnOrigins,
 } from "@/lib/env";
+import { strayUrl } from "@/lib/sso-account-continue";
 
 const CORETAP_FRONTCHANNEL_PATH = "/api/auth/sso/authtap/frontchannel-logout";
 const NEXUSTAP_FRONTCHANNEL_PATH = "/api/auth/sso/authtap/frontchannel-logout";
@@ -118,10 +119,10 @@ export function chainFrontchannelLogouts(apps: FrontchannelApp[], finalUrl: stri
   }, finalUrl);
 }
 
-/** After the last AuthTAP account is removed, expire product cookies then return to AuthTAP login. */
-export function afterLastAccountSignOutUrl(authtapOrigin: string): string {
+/** After the last AuthTAP account is removed, expire product cookies then leave AuthTAP. */
+export function afterLastAccountSignOutUrl(): string {
   const apps = productFrontchannelApps();
-  const login = new URL("/login", authtapOrigin).toString();
-  if (!apps.length) return login;
-  return chainFrontchannelLogouts(apps, login);
+  const final = strayUrl();
+  if (!apps.length) return final;
+  return chainFrontchannelLogouts(apps, final);
 }

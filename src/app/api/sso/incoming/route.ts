@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { publicUrl } from "@/lib/public-origin";
+import { strayUrl } from "@/lib/sso-account-continue";
 import { parseContinueInput, ssoIncomingPath } from "@/lib/sso-continue";
 
 export const runtime = "nodejs";
@@ -22,7 +23,7 @@ export async function GET(req: NextRequest) {
       client: req.nextUrl.searchParams.get("client") ?? "",
       returnHost,
     });
-    return NextResponse.redirect(publicUrl("/account", req));
+    return NextResponse.redirect(strayUrl());
   }
 
   // Do not read at_session here. Product hops are cross-site (especially

@@ -13,7 +13,7 @@ describe("AuthTAP front-channel chain", () => {
   it("walks every configured CoreTAP origin so localhost and core-tap.local both expire", () => {
     process.env.AUTHTAP_FRONTCHANNEL_CLIENTS = "coretap";
     process.env.CORETAP_RETURN_ORIGINS = "http://localhost:3000,http://core-tap.local:3000";
-    const dest = afterLastAccountSignOutUrl("http://localhost:3004");
+    const dest = afterLastAccountSignOutUrl();
     const first = new URL(dest);
     expect(first.origin + first.pathname).toBe(
       "http://localhost:3000/api/auth/sso/authtap/frontchannel-logout",
@@ -22,21 +22,21 @@ describe("AuthTAP front-channel chain", () => {
     expect(second.origin + second.pathname).toBe(
       "http://core-tap.local:3000/api/auth/sso/authtap/frontchannel-logout",
     );
-    expect(second.searchParams.get("next")).toBe("http://localhost:3004/login");
+    expect(second.searchParams.get("next")).toBe("https://deltakinetics.io");
   });
 
   it("includes only the clients listed in AUTHTAP_FRONTCHANNEL_CLIENTS", () => {
     process.env.AUTHTAP_FRONTCHANNEL_CLIENTS = "coretap";
     process.env.CORETAP_RETURN_ORIGINS = "http://localhost:3000";
-    const dest = afterLastAccountSignOutUrl("http://localhost:3004");
+    const dest = afterLastAccountSignOutUrl();
     const first = new URL(dest);
     expect(first.origin + first.pathname).toBe(
       "http://localhost:3000/api/auth/sso/authtap/frontchannel-logout",
     );
-    expect(first.searchParams.get("next")).toBe("http://localhost:3004/login");
+    expect(first.searchParams.get("next")).toBe("https://deltakinetics.io");
   });
 
-  it("includes CoreTAP then NexusTAP then SignalTAP then ShiftTAP before AuthTAP login", () => {
+  it("includes CoreTAP then NexusTAP then SignalTAP then ShiftTAP before leaving AuthTAP", () => {
     delete process.env.AUTHTAP_FRONTCHANNEL_CLIENTS;
     const apps = productFrontchannelApps();
     expect(apps.map((app) => `${app.origin}${app.path}`)).toEqual([
@@ -46,7 +46,7 @@ describe("AuthTAP front-channel chain", () => {
       "http://localhost:3005/api/auth/sso/authtap/frontchannel-logout",
     ]);
 
-    const dest = afterLastAccountSignOutUrl("http://localhost:3004");
+    const dest = afterLastAccountSignOutUrl();
     const first = new URL(dest);
     expect(first.origin + first.pathname).toBe(
       "http://localhost:6100/api/auth/sso/authtap/frontchannel-logout",
@@ -63,6 +63,6 @@ describe("AuthTAP front-channel chain", () => {
     expect(fourth.origin + fourth.pathname).toBe(
       "http://localhost:3005/api/auth/sso/authtap/frontchannel-logout",
     );
-    expect(fourth.searchParams.get("next")).toBe("http://localhost:3004/login");
+    expect(fourth.searchParams.get("next")).toBe("https://deltakinetics.io");
   });
 });

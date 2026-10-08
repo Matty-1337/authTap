@@ -6,7 +6,7 @@ import {
   destinationWhenAlreadyVerified,
   loginContinuePath,
   parseContinueInput,
-  pathAfterIncomingStore,
+  pathAfterIncoming,
   productHandoffUrl,
   ssoIncomingPath,
 } from "@/lib/sso-continue";
@@ -153,24 +153,24 @@ describe("same-site incoming hop", () => {
     expect(path).toContain("state=state-token-1");
   });
 
-  it("sends a signed-in hop to the picker and an unsigned hop to login", () => {
-    expect(pathAfterIncomingStore(true, request)).toBe("/continue");
-    expect(pathAfterIncomingStore(false, request)).toBe(loginContinuePath(request));
+  it("skips the picker for one account, shows it for two, asks for a password for none", () => {
+    expect(pathAfterIncoming(1, request)).toBe("/api/sso/complete");
+    expect(pathAfterIncoming(2, request)).toBe("/continue");
+    expect(pathAfterIncoming(0, request)).toBe(loginContinuePath(request));
     expect(loginContinuePath(request).startsWith("/login?")).toBe(true);
   });
 
-  it("sends a product-hop verify to Continue instead of the warehouse", () => {
+  it("sends a product-hop verify to Continue and a hop-less verify off AuthTAP", () => {
     expect(destinationAfterVerify(request)).toBe("/continue");
-    expect(destinationAfterVerify(null)).toBe("/account");
+    expect(destinationAfterVerify(null)).toBe("https://deltakinetics.io");
   });
 
   it("finishes an already-verified hop instead of showing a login error", () => {
     expect(destinationWhenAlreadyVerified(request, true)).toBe(ssoIncomingPath(request));
     expect(destinationWhenAlreadyVerified(request, false)).toBe(loginContinuePath(request));
-    // No product hop: the account is verified but AuthTAP cannot add it to the
-    // store without credentials, so route to sign-in (not the warehouse, which
-    // would omit the freshly verified account) regardless of an existing session.
-    expect(destinationWhenAlreadyVerified(null, true)).toBe("/login");
-    expect(destinationWhenAlreadyVerified(null, false)).toBe("/login");
+    // No product hop: there is no product to return to, so leave AuthTAP
+    // regardless of an existing session.
+    expect(destinationWhenAlreadyVerified(null, true)).toBe("https://deltakinetics.io");
+    expect(destinationWhenAlreadyVerified(null, false)).toBe("https://deltakinetics.io");
   });
 });
