@@ -319,6 +319,38 @@ describe("POST /api/auth/sign-in", () => {
     expect(handoffToProduct).not.toHaveBeenCalled();
   });
 
+  it("sends a login that still needs verification to the verify step with the product hop", async () => {
+    vi.mocked(dkLogin).mockResolvedValue({
+      ok: true,
+      needsVerification: true,
+      email: "new@example.com",
+    });
+
+    const res = await postSignIn(
+      formRequest(
+        "http://localhost:3004/api/auth/sign-in",
+        {
+          mode: "login",
+          password: "secret123",
+          client: "coretap",
+          return_to: "http://localhost:3000/auth/authtap/callback",
+          state: "state-token-1",
+        },
+        "at_pending_email=login:new@example.com",
+      ),
+    );
+
+    expect(res.status).toBe(303);
+    const location = new URL(res.headers.get("location") ?? "");
+    expect(location.origin + location.pathname).toBe("http://localhost:3004/verify-email");
+    expect(location.searchParams.get("email")).toBe("new@example.com");
+    expect(location.searchParams.get("client")).toBe("coretap");
+    expect(location.searchParams.get("state")).toBe("state-token-1");
+    expect(res.cookies.get("at_continue")?.value).toBeTruthy();
+    expect(res.cookies.get("at_pending_verify")?.value).toBe("new@example.com");
+    expect(res.cookies.get("at_session")?.value).toBeUndefined();
+  });
+
   it("registers the form email even if a leftover pending-email cookie is Fancy", async () => {
     vi.mocked(dkRegister).mockResolvedValue({
       ok: true,

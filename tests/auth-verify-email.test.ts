@@ -142,6 +142,18 @@ describe("POST /api/auth/verify-email", () => {
     expect(payload.activeUserId).toBe(user.id);
   });
 
+  it("keeps the product hop from the verify form after at_continue has expired", async () => {
+    vi.mocked(dkVerifyEmail).mockResolvedValue({ ok: true, token: "core-token", user });
+
+    const res = await postVerify(verifyReq(continueFields, "at_continue=expired-and-unverifiable"));
+    const data = (await res.json()) as { ok?: boolean; url?: string };
+    expect(data.ok).toBe(true);
+    expect(new URL(data.url ?? "").pathname).toBe("/continue");
+    const fresh = res.cookies.get("at_continue")?.value ?? "";
+    expect(fresh).toBeTruthy();
+    expect(fresh).not.toBe("expired-and-unverifiable");
+  });
+
   it("keeps the product hop from at_continue when the verify form omits it", async () => {
     vi.mocked(dkVerifyEmail).mockResolvedValue({ ok: true, token: "core-token", user });
     const continueToken = await new SignJWT({
