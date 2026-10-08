@@ -186,9 +186,14 @@ export function loginContinuePath(request: ContinueRequest): string {
   return continuePath("/login", request);
 }
 
-/** After the same-site hop: picker if signed in, password only if not. */
-export function pathAfterIncomingStore(hasStore: boolean, request: ContinueRequest): string {
-  return hasStore ? "/continue" : loginContinuePath(request);
+/**
+ * After the same-site hop. One signed-in account goes straight back to the
+ * product with no extra click; two or more get the picker; none gets the
+ * password step. The picker is only skipped when there is nothing to pick.
+ */
+export function pathAfterIncoming(accountCount: number, request: ContinueRequest): string {
+  if (accountCount <= 0) return loginContinuePath(request);
+  return accountCount === 1 ? "/api/sso/complete" : "/continue";
 }
 
 /**

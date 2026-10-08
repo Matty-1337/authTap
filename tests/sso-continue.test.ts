@@ -6,7 +6,7 @@ import {
   destinationWhenAlreadyVerified,
   loginContinuePath,
   parseContinueInput,
-  pathAfterIncomingStore,
+  pathAfterIncoming,
   productHandoffUrl,
   ssoIncomingPath,
 } from "@/lib/sso-continue";
@@ -153,9 +153,10 @@ describe("same-site incoming hop", () => {
     expect(path).toContain("state=state-token-1");
   });
 
-  it("sends a signed-in hop to the picker and an unsigned hop to login", () => {
-    expect(pathAfterIncomingStore(true, request)).toBe("/continue");
-    expect(pathAfterIncomingStore(false, request)).toBe(loginContinuePath(request));
+  it("skips the picker for one account, shows it for two, asks for a password for none", () => {
+    expect(pathAfterIncoming(1, request)).toBe("/api/sso/complete");
+    expect(pathAfterIncoming(2, request)).toBe("/continue");
+    expect(pathAfterIncoming(0, request)).toBe(loginContinuePath(request));
     expect(loginContinuePath(request).startsWith("/login?")).toBe(true);
   });
 
